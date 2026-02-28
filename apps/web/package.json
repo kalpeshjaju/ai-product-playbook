@@ -1,0 +1,7 @@
+{
+  "name": "@playbook/web",
+  "version": "0.1.0",
+  "description": "Desktop web app (deploy target: Vercel)",
+  "private": true,
+  "scripts": {}
+}

@@ -36,6 +36,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Turbo
+.turbo/
+
 # Misc
 *.log
 tmp/

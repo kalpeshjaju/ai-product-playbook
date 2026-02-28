@@ -1,0 +1,7 @@
+{
+  "name": "@playbook/alexa",
+  "version": "0.1.0",
+  "description": "Alexa skill (deploy target: AWS Lambda)",
+  "private": true,
+  "scripts": {}
+}

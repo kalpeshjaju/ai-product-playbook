@@ -1,0 +1,51 @@
+##
+# FILE PURPOSE: Deploy API to Railway on push to main
+#
+# WHY: Path-filtered deploys — only deploys when API or shared packages change.
+# HOW: Railway CLI deploy. Stack TBD (placeholder until framework chosen).
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-02-28
+##
+
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/shared-types/**'
+      - 'packages/shared-llm/**'
+
+concurrency:
+  group: deploy-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Uncomment when Railway is configured:
+    # environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Build shared packages
+        run: npx turbo run build --filter=@playbook/api...
+
+      # Uncomment when Railway is configured:
+      # - name: Deploy to Railway
+      #   run: railway up
+      #   working-directory: apps/api
+      #   env:
+      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Placeholder
+        run: echo "API deploy pipeline ready — configure Railway when framework is chosen"

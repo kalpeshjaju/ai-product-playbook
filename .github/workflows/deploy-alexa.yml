@@ -1,0 +1,49 @@
+##
+# FILE PURPOSE: Deploy Alexa skill to AWS Lambda on push to main
+#
+# WHY: Path-filtered deploys — only deploys when Alexa skill changes.
+# HOW: ASK CLI or AWS CDK deploy. Stack TBD.
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-02-28
+##
+
+name: Deploy Alexa
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/alexa/**'
+      - 'packages/shared-types/**'
+      - 'packages/shared-llm/**'
+
+concurrency:
+  group: deploy-alexa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Build shared packages
+        run: npx turbo run build --filter=@playbook/alexa...
+
+      # Uncomment when ASK CLI is configured:
+      # - name: Deploy to Lambda
+      #   run: ask deploy
+      #   working-directory: apps/alexa
+      #   env:
+      #     ASK_ACCESS_TOKEN: ${{ secrets.ASK_ACCESS_TOKEN }}
+
+      - name: Placeholder
+        run: echo "Alexa deploy pipeline ready — configure ASK CLI when skill is built"

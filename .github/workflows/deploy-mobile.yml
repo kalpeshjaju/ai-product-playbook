@@ -1,0 +1,50 @@
+##
+# FILE PURPOSE: Deploy mobile app (iOS + Android) on push to main
+#
+# WHY: Path-filtered deploys — only deploys when mobile app or shared packages change.
+# HOW: Expo/EAS Build or direct Fastlane. Stack TBD.
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-02-28
+##
+
+name: Deploy Mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared-types/**'
+      - 'packages/shared-ui/**'
+      - 'packages/shared-llm/**'
+
+concurrency:
+  group: deploy-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Build shared packages
+        run: npx turbo run build --filter=@playbook/mobile...
+
+      # Uncomment when EAS is configured:
+      # - name: Build iOS + Android
+      #   run: npx eas-cli build --platform all --non-interactive
+      #   working-directory: apps/mobile
+      #   env:
+      #     EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Placeholder
+        run: echo "Mobile deploy pipeline ready — configure EAS/Fastlane when framework is chosen"

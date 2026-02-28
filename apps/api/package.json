@@ -1,0 +1,7 @@
+{
+  "name": "@playbook/api",
+  "version": "0.1.0",
+  "description": "Shared backend API (deploy target: Railway)",
+  "private": true,
+  "scripts": {}
+}

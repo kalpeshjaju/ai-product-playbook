@@ -1,0 +1,32 @@
+{
+  "name": "ai-product-playbook",
+  "version": "0.1.0",
+  "description": "LLM-Maintained Enterprise Playbook — monorepo for multi-platform product",
+  "type": "module",
+  "private": true,
+  "packageManager": "npm@10.9.4",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "type-check": "turbo run type-check",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "check": "turbo run type-check lint test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^3.0.0"
+  }
+}

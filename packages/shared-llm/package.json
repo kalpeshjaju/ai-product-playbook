@@ -1,0 +1,22 @@
+{
+  "name": "@playbook/shared-llm",
+  "version": "0.1.0",
+  "description": "LLM resilience patterns — JSON extraction, cost tracking, fallback monitoring",
+  "type": "module",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "build": "tsc",
+    "lint": "eslint src/ --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jsonrepair": "^3.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

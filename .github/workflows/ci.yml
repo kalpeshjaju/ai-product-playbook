@@ -1,3 +1,15 @@
+##
+# FILE PURPOSE: CI quality gates — single orchestrator for all apps
+#
+# WHY: Every tool plugs into GitHub Actions. No tool-to-tool wiring.
+#      One workflow runs quality gates across the entire monorepo.
+# HOW: Turborepo runs type-check, lint, test across all workspaces.
+#      Architecture and doc checks run universally.
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-02-28
+##
+
 name: CI
 
 on:
@@ -11,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ─── Universal checks (always run) ─────────────────────────────────
+  # ─── Universal quality gates ────────────────────────────────────
   quality-gates:
     runs-on: ubuntu-latest
     steps:
@@ -19,10 +31,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      # TypeScript + ESLint + Tests via Turborepo
+      - name: Type check
+        run: npx turbo run type-check
+
+      - name: Lint
+        run: npx turbo run lint
+
+      - name: Test
+        run: npx turbo run test
+
       # Architecture limits (file size, function size)
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Check architecture limits
         run: python scripts/check_architecture_limits.py
@@ -36,6 +65,22 @@ jobs:
         if: github.event_name == 'pull_request'
         run: bash scripts/hallucination_check.sh --base ${{ github.event.pull_request.base.ref || 'main' }}
 
+  # ─── Python checks ───────────────────────────────────────────────
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint Python
+        run: ruff check packages/ apps/ --config pyproject.toml
+
   # ─── Secret scanning ───────────────────────────────────────────────
   security:
     runs-on: ubuntu-latest
@@ -48,38 +93,3 @@ jobs:
         uses: GitGuardian/ggshield-action@v1
         env:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
-
-  # ─── Stack-specific checks (uncomment as you add code) ─────────────
-
-  # backend:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.11"
-  #         cache: pip
-  #     - run: pip install -r requirements.txt -r requirements-dev.txt
-  #     - name: Lint
-  #       run: ruff check src/ backend/
-  #     - name: Type check
-  #       run: mypy src/ backend/ --ignore-missing-imports
-  #     - name: Tests
-  #       run: pytest tests/ -x -q
-
-  # frontend:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: "22"
-  #         cache: "npm"
-  #         cache-dependency-path: frontend/package-lock.json
-  #     - run: cd frontend && npm ci
-  #     - name: Lint
-  #       run: cd frontend && npm run lint
-  #     - name: Type check
-  #       run: cd frontend && npx tsc --noEmit
-  #     - name: Build
-  #       run: cd frontend && npm run build

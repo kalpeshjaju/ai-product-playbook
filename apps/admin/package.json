@@ -1,0 +1,7 @@
+{
+  "name": "@playbook/admin",
+  "version": "0.1.0",
+  "description": "Admin panel (deploy target: Vercel)",
+  "private": true,
+  "scripts": {}
+}

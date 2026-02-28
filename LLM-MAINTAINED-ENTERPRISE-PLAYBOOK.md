@@ -61,8 +61,8 @@ Every AI product has four distinct pillars. This playbook covers all four:
 14. [Master Checklists](#14-master-checklists)
 15. [Templates](#15-templates)
 16. [AI Product Stack & Architecture](#16-ai-product-stack--architecture) — Fluid Frontend, Component Generation, Design System Enforcement
-17. [Testing Strategy for Fluid AI Products](#17-testing-strategy-for-fluid-ai-products) — Visual Regression, Streaming E2E, Non-Deterministic Output
-18. [Cost Control, Observability & Abuse Prevention](#18-cost-control-observability--abuse-prevention) — LLM Gateway, Model Routing, Denial-of-Wallet
+17. [Testing Strategy for Fluid AI Products](#17-testing-strategy-for-fluid-ai-products) — Visual Regression, Streaming E2E, Non-Deterministic Output, Over-Mocking Detection
+18. [Cost Control, Observability & Abuse Prevention](#18-cost-control-observability--abuse-prevention) — LLM Gateway, Model Routing, Denial-of-Wallet, LLM Response Resilience, Dual-Layer Cost Tracking
 19. [Data Ingestion & Living Inputs](#19-data-ingestion--living-inputs) — Multi-Modal Parsing, Embedding Versioning, Enrichment, Voice, Freshness
 A. [Reference Stack](#appendix-a-reference-stack)
 B. [Industry Context (February 2026)](#appendix-b-industry-context-february-2026)
@@ -3280,6 +3280,48 @@ RULE 3: ADVERSARIAL PAYLOAD TESTS FOR EVERY PUBLIC ENDPOINT             [HARD GA
   corresponding adversarial test file.
 ```
 
+### Over-Mocking Tests (v6.2 addition)
+
+LLMs love mocking. Given a test to write, they'll mock every dependency, effectively testing nothing but the mock setup. The result: 100% coverage, 0% confidence.
+
+```
+THE OVER-MOCKING ANTI-PATTERN:
+
+❌ BAD: Mock the unit under test
+  // Tests accessibility-agent but mocks the agent's core analysis method
+  vi.spyOn(agent, 'analyzeDOM').mockResolvedValue({ score: 85, findings: [] });
+  const result = await agent.run(artifacts);
+  expect(result.score).toBe(85);  // You just tested your mock, not your agent
+
+❌ BAD: Mock data transformations
+  // Tests JSON parsing but mocks JSON.parse
+  vi.spyOn(JSON, 'parse').mockReturnValue({ valid: true });
+  const result = extractJson(response);
+  // Congratulations, your JSON extractor works perfectly (in fantasy land)
+
+✅ GOOD: Mock data boundaries only
+  // Mock the LLM API call (external boundary), but let the agent process real data
+  vi.spyOn(llmClient, 'chat').mockResolvedValue({
+    content: [{ type: 'text', text: '{"score": 7, "findings": [...]}' }],
+    usage: { input_tokens: 500, output_tokens: 200 },
+  });
+  const result = await agent.run(realArtifacts);  // Real processing, mocked network
+  expect(result.findings).toContainEqual(
+    expect.objectContaining({ severity: 'high' })
+  );
+
+✅ GOOD: Use deterministic replay fixtures
+  // Record real LLM responses once, replay deterministically in tests
+  const fixture = loadReplayFixture('accessibility-agent-response.json');
+  vi.spyOn(llmClient, 'chat').mockResolvedValue(fixture.response);
+  const result = await agent.run(fixture.artifacts);
+  expect(result.findings.length).toBeGreaterThan(0);
+```
+
+**The Rule**: Mock at system boundaries (network, filesystem, database, clock). Never mock the code you're testing. If your test setup is longer than the code it tests, you're over-mocking.
+
+**Enforcement [REVIEWER GATE]**: Code review checks that test mocks only external dependencies, not internal methods. Tests directory should contain `fixtures/replay/` with recorded LLM responses for deterministic agent testing.
+
 ---
 
 ## 18. Cost Control, Observability & Abuse Prevention
@@ -3563,6 +3605,266 @@ PATTERN 3: PER-RUN COST TELEMETRY                                      [HARD GAT
   ENFORCEMENT: Every agent/pipeline entry point logs a cost summary on completion.
   Langfuse traces group by run_id. Alert if any single run exceeds $X threshold.
 ```
+
+### LLM Response Resilience Patterns (v6.2 addition)
+
+These patterns address the gap between "LLM returned a response" and "the response is usable." Production LLM systems fail not because the API is down, but because the response is malformed, incomplete, or fabricated.
+
+#### Pattern 4: Multi-Strategy JSON Extraction
+
+LLMs wrap JSON in markdown, add trailing commas, inject comments, and sometimes return partial objects. Naively calling `JSON.parse()` on LLM output fails 15-30% of the time in production.
+
+```typescript
+// src/resilience/json-extractor.ts
+//
+// Multi-strategy JSON extraction with progressive fallback.
+// Each strategy is tried in order of reliability.
+
+function extractJson(text: string): unknown {
+  const strategies = [
+    () => extractFromSentinelEnvelope(text),   // JSON_OUTPUT_START...JSON_OUTPUT_END
+    () => extractFromMarkdownBlock(text),       // ```json ... ```
+    () => extractBalancedBraces(text),          // Proper { } depth matching
+    () => extractGreedyMatch(text),             // First { to last }
+    () => extractFullText(text),                // Entire response is JSON
+  ];
+
+  for (const strategy of strategies) {
+    const extracted = strategy();
+    if (extracted) return parseAndRepair(extracted);
+  }
+
+  throw new Error('No JSON found in LLM response');
+}
+
+// Parse with progressive repair: direct → remove comments → jsonrepair library
+function parseAndRepair(text: string): unknown {
+  try { return JSON.parse(text); } catch { /* continue */ }
+
+  // Remove trailing commas, single-line comments, multi-line comments
+  let repaired = text
+    .replace(/,(\s*[}\]])/g, '$1')           // Trailing commas
+    .replace(/\/\/[^\n]*/g, '')               // // comments
+    .replace(/\/\*[\s\S]*?\*\//g, '');        // /* */ comments
+
+  try { return JSON.parse(repaired); } catch { /* continue */ }
+
+  // Final attempt: jsonrepair library (handles 95%+ of LLM JSON malformation)
+  const { jsonrepair } = require('jsonrepair');
+  return JSON.parse(jsonrepair(repaired));
+}
+```
+
+**The Sentinel Pattern**: For structured output, instruct the LLM to wrap JSON between sentinel markers (`JSON_OUTPUT_START` / `JSON_OUTPUT_END`). This eliminates ambiguity about where the JSON starts and ends, even when the LLM adds explanatory text.
+
+**Enforcement [HARD GATE]**: All LLM response parsing must go through a centralized JSON extractor. Direct `JSON.parse()` on raw LLM output is banned (lint rule). The extractor should track which strategy succeeded for monitoring (strategy 1 = healthy, strategy 4+ = degraded prompts).
+
+#### Pattern 5: Data Falsification with Default Operators
+
+The `||` operator in JavaScript creates data out of thin air. When an LLM response field is empty, `||` silently replaces it with a default — making it look like the LLM produced a real value when it didn't.
+
+```typescript
+// ❌ BAD: Data falsification — creates fake data when LLM fails
+const summary = response.summary || "No issues found";
+const score = response.score || 100;
+const recommendations = response.items || ["General improvement needed"];
+
+// Why this is dangerous:
+// - "No issues found" is WRONG — it means the LLM failed to analyze
+// - score=100 is WRONG — it means the LLM didn't score anything
+// - "General improvement needed" is WRONG — it's fabricated advice
+
+// ✅ GOOD: Conditional creation — only create output when data exists
+const summary = response.summary ?? undefined;    // null/undefined → absent
+const score = response.score ?? null;              // null → explicitly absent
+const recommendations = response.items?.length
+  ? response.items                                 // Real data → use it
+  : [];                                            // No data → empty (honest)
+
+// ✅ BEST: Track when fallbacks fire
+if (!response.summary) {
+  logger.warn({ agent, field: 'summary' }, 'LLM returned empty field — using absence');
+  metrics.increment('llm.empty_field', { agent, field: 'summary' });
+}
+```
+
+**The Rule**: Never use `||` with LLM output. Use `??` for null-coalescing (preserves `""` and `0`). Use conditional creation (check existence first, don't substitute). Track every instance where an LLM field was empty — it's a signal your prompt is broken.
+
+**Enforcement [REVIEWER GATE]**: Code review flags `||` with LLM response fields. ESLint rule `prefer-nullish-coalescing` catches the easy cases.
+
+#### Pattern 6: Fallback Rate Monitoring
+
+Every resilience pattern (JSON repair, template fallback, default values) makes your system more robust. But they also hide degradation. If your JSON repair strategy 4 fires 50% of the time, your prompts are broken — but your users see no errors.
+
+```typescript
+// Track fallback invocations, not just errors
+class FallbackMonitor {
+  private counters: Map<string, { primary: number; fallback: number }> = new Map();
+
+  recordPrimary(feature: string): void {
+    const c = this.counters.get(feature) || { primary: 0, fallback: 0 };
+    c.primary++;
+    this.counters.set(feature, c);
+  }
+
+  recordFallback(feature: string, reason: string): void {
+    const c = this.counters.get(feature) || { primary: 0, fallback: 0 };
+    c.fallback++;
+    this.counters.set(feature, c);
+    logger.warn({ feature, reason, fallbackRate: c.fallback / (c.primary + c.fallback) },
+      'Fallback triggered');
+  }
+
+  getFallbackRate(feature: string): number {
+    const c = this.counters.get(feature);
+    if (!c || (c.primary + c.fallback) === 0) return 0;
+    return c.fallback / (c.primary + c.fallback);
+  }
+}
+
+// Alert when fallback rate exceeds threshold
+// 10%+ → log warning | 30%+ → page on-call | 50%+ → rollback prompt change
+```
+
+**Enforcement [SOFT CHECK]**: Monitoring dashboard tracks fallback rate per feature. Alert rules in observability platform. Monthly cost report includes fallback rates alongside costs.
+
+#### Pattern 7: Prioritized Processing Under Timeout
+
+When an agent has 300 seconds to process 200 findings but can only handle 50, the naive approach processes the first 50 (arbitrary order). The correct approach processes the 50 most important findings.
+
+```typescript
+async function processWithBudget(
+  findings: Finding[],
+  timeoutMs: number,
+  batchSizeMs: number,
+): Promise<ProcessedFinding[]> {
+  const safetyMarginMs = 60_000;  // 1-minute buffer for cleanup
+  const maxBatches = Math.floor((timeoutMs - safetyMarginMs) / batchSizeMs);
+  const maxFindings = maxBatches * BATCH_SIZE;
+
+  if (findings.length > maxFindings) {
+    logger.warn({ total: findings.length, processing: maxFindings },
+      'Truncating to fit timeout budget');
+
+    // Sort by severity: critical → high → medium → low
+    const prioritized = [...findings].sort((a, b) => {
+      const order = { critical: 0, high: 1, medium: 2, low: 3 };
+      return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
+    });
+
+    return processBatches(prioritized.slice(0, maxFindings));
+  }
+
+  return processBatches(findings);
+}
+```
+
+**The Rule**: When you have a time budget and more work than budget allows, sort by impact before truncating. Never process in arbitrary order and hope the important items come first.
+
+**Enforcement [DOCS ONLY]**: Document the prioritization strategy in the agent file header. Test with oversized input to verify truncation preserves critical items.
+
+#### Pattern 8: Timeout Alignment Across Layers
+
+When agent timeout = 300s and executor timeout = 300s, the executor kills the agent before the agent's own timeout protection can fire. The agent's cleanup code never runs.
+
+```
+TIMEOUT ALIGNMENT RULE:
+
+  Agent internal timeout  <  Executor timeout  <  HTTP request timeout
+
+  Example:
+  ├── Agent: 240s (4 minutes)      — agent manages its own work within this
+  ├── Executor: 300s (5 minutes)   — kills agent if it hangs, gives 60s margin
+  └── HTTP: 330s (5.5 minutes)     — client sees timeout, gives 30s for cleanup
+
+  WHY: If agent = executor = 300s:
+  - Agent starts cleanup at 299s
+  - Executor kills at 300s
+  - Cleanup never completes
+  - Resources leak, partial results lost
+
+  MARGIN FORMULA:
+  executor_timeout = agent_timeout + cleanup_margin (60s recommended)
+  http_timeout = executor_timeout + response_margin (30s recommended)
+```
+
+**Enforcement [REVIEWER GATE]**: Code review checks that timeout values follow the layered hierarchy. Timeout constants should be defined centrally (in config, not scattered across files) so the relationship is visible.
+
+### Dual-Layer Cost Tracking (v6.2 addition)
+
+Cost tracking at the **provider layer only** tells you what you spent. Cost tracking at the **agent layer only** tells you who spent it. You need both.
+
+```
+TWO LAYERS, TWO TRUTHS:
+
+PROVIDER LAYER (billing truth)           AGENT LAYER (attribution truth)
+─────────────────────────────           ──────────────────────────────
+Records every API call                  Records every agent operation
+Captures retries (3 calls for 1 op)     Captures logical cost (1 operation)
+Knows actual model used (after route)   Knows feature/agent that requested it
+Tracks cache hits at proxy level        Tracks agent-level decisions
+Enables: budget alerts, billing audit   Enables: "which feature is expensive?"
+
+Example:
+  Agent "synthesis" calls LLM once.
+  Provider layer sees:
+    - Call 1: 502 (retry) → $0.00
+    - Call 2: 200 (success) → $0.03
+    - Total billed: $0.03
+
+  Agent layer sees:
+    - synthesis: 1 operation → $0.03
+    - (doesn't know about the retry)
+
+  BOTH are correct. BOTH are needed.
+```
+
+```typescript
+// Provider layer: CostLedger (tracks every API call)
+class CostLedger {
+  recordCall(agent: string, model: string, tokens: { in: number; out: number },
+             latencyMs: number, success: boolean): void {
+    const cost = this.calculateCost(model, tokens);
+    this.totalCost += cost;
+    this.byAgent.get(agent)?.push({ cost, tokens, latencyMs, success });
+    if (this.totalCost > this.MAX_BUDGET) {
+      throw new CostLimitExceededError(this.totalCost, this.MAX_BUDGET);
+    }
+  }
+}
+
+// Agent layer: LLMMonitor (tracks per-operation cost with feature attribution)
+class LLMMonitor {
+  async trackCall<T>(featureId: string, model: string, fn: () => Promise<T>): Promise<T> {
+    const start = Date.now();
+    try {
+      const result = await fn();
+      this.save(featureId, model, Date.now() - start, true);
+      return result;
+    } catch (err) {
+      this.save(featureId, model, Date.now() - start, false);
+      throw err;
+    }
+  }
+}
+```
+
+```python
+# Python equivalent: Thread-safe cost tracker with per-conversation aggregation
+class CostTracker:
+    def record(self, *, provider: str, model: str, caller: str,
+               conversation_id: str, prompt_tokens: int,
+               completion_tokens: int, duration_ms: float, success: bool) -> None:
+        cost = self._estimate_cost(model, prompt_tokens, completion_tokens)
+        with self._lock:
+            self._records.append(CallRecord(...))
+
+    def conversation_summary(self, conversation_id: str) -> CostSummary: ...
+    def agent_observability(self, agent_name: str) -> AgentObservability: ...
+    # Returns p50, p95, max latency + error rate per agent
+```
+
+**Enforcement [HARD GATE]**: CI checks that every LLM client call goes through both layers. The provider layer has a hard budget cap (kills the run if exceeded). The agent layer reports per-feature cost in the output. Monthly cost reports include both views.
 
 ---
 
@@ -3967,6 +4269,11 @@ This is why the playbook's enforcement principle exists: every claim of "done" m
 8. **Session handoff protocol** — No tool captures "where I left off" for the next LLM. Handoff format defined in Section 2.
 9. **Developer-side cost tracking** — No tool aggregates spend across Claude Code + Cursor + Codex + Gemini. Manual tracking template in Section 8.
 10. **Auto-changelog from LLM commits** — Conventional commits + release-please. Tools exist but no playbook integrates them into the LLM workflow (Section 11).
+11. **LLM response resilience patterns** — Multi-strategy JSON extraction, data falsification prevention, fallback rate monitoring — no framework provides these as first-class patterns (Section 18).
+12. **Dual-layer cost tracking** — Provider layer (billing truth) + agent layer (attribution truth). No tool tracks both (Section 18).
+13. **Timeout alignment across layers** — Agent < executor < HTTP timeout hierarchy. No framework enforces this relationship (Section 18).
+14. **Over-mocking detection** — No testing tool flags tests that mock the unit under test instead of external boundaries (Section 17).
+15. **Prioritized processing under timeout** — No agent framework sorts by severity before truncating to fit a time budget (Section 18).
 
 The playbook's approach — docs as memory, automation as enforcement, layered defense — aligns with how the most sophisticated engineering orgs (Stripe, Uber, Google) are solving this problem at scale.
 
@@ -4084,6 +4391,9 @@ Per-agent-run cost telemetry                   Langfuse run_id grouping         
 Embedding vectors tagged with model_id         Lint for model_id in metadata       2
 Voice transcription includes diarization       Ingestion pipeline validation       2
 Enrichment pipeline is idempotent              Integration test (re-run safe)      2
+JSON extraction via centralized extractor      Lint (ban raw JSON.parse on LLM)    2
+Dual-layer cost tracking (provider + agent)    CI check for both tracking layers   2
+No direct JSON.parse on LLM output             ESLint no-restricted-syntax         2
 ```
 
 ### [SOFT CHECK] — CI warns, does not block
@@ -4105,6 +4415,7 @@ SSE first-token latency (< 3s)                 Playwright custom assertion      
 Dedup rate (alert if 0% — pipeline broken)     Monthly ingestion report            2
 Ingestion records missing timestamps           CI lint for ingested_at/valid_until  2
 Data freshness (% of KB >6 months old)         Monthly freshness report            2
+Fallback rate exceeds 30% threshold            Monitoring alert (PagerDuty/Slack)  2
 ```
 
 ### [REVIEWER GATE] — Code review (human or LLM maker-checker)
@@ -4125,6 +4436,9 @@ Decision log entry for non-trivial choices     Code review
 Visual smoke test before production            Manual click-through (non-coder)
 LLM output uses standard <LLMOutput> wrapper   Code review
 API pattern documented (REST/tRPC/SSE/MCP)     Code review
+No || with LLM response fields (use ??)        Code review + ESLint
+Test mocks only external boundaries            Code review
+Timeout alignment (agent < executor < HTTP)    Code review
 ```
 
 ### [DOCS ONLY] — Documented practice, no automation
@@ -4150,6 +4464,7 @@ Deploy order (backend first when dependent)    DEPLOYMENT.md runbook
 Chunking strategy documented                   ARCHITECTURE.md
 Enrichment conflict resolution rules           ARCHITECTURE.md
 Embedding re-indexing budget as line item      Infra budget / ARCHITECTURE.md
+Prioritization strategy for timeout truncation Agent file header + ARCHITECTURE.md
 ```
 
 ### Classification Principle
@@ -4162,8 +4477,8 @@ Embedding re-indexing budget as line item      Infra budget / ARCHITECTURE.md
 
 ---
 
-**Version**: 6.1.0
+**Version**: 6.2.0
 **Status**: Final
-**Incorporates**: v6.0.0 + Multi-LLM collaboration gaps: single-source-of-truth instruction files (CLAUDE.md + pointers), LLM review conflict resolution, session handoff protocol, auto-changelog from conventional commits, developer-side LLM cost tracking, CLAUDE.md versioning guidance. 5 new entries in "What No Tool Solves" (Appendix B).
-**Previous**: v6.0.0 — v5.1 + Fourth pillar: INPUT (Data Ingestion & Living Inputs, Section 19)
+**Incorporates**: v6.1.0 + 7 LLM resilience patterns from production (ui-ux-audit-tool + job-matchmaker): multi-strategy JSON extraction (Section 18), data falsification prevention with `||` (Section 18), fallback rate monitoring (Section 18), prioritized processing under timeout (Section 18), timeout alignment across layers (Section 18), over-mocking tests detection (Section 17), dual-layer cost tracking at provider + agent levels (Section 18). 5 new entries in "What No Tool Solves" (items 11-15, Appendix B). 9 new rule classifications in Appendix D.
+**Previous**: v6.1.0 — v6.0.0 + Multi-LLM collaboration gaps (CLAUDE.md pointers, conflict resolution, session handoff, auto-changelog, dev-side cost tracking, CLAUDE.md versioning)
 **Validation**: See `docs/PLAYBOOK-VALIDATION-REPORT.md` for full section-by-section validation with sources

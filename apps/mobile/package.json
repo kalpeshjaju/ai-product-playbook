@@ -1,0 +1,7 @@
+{
+  "name": "@playbook/mobile",
+  "version": "0.1.0",
+  "description": "Mobile app — iOS + Android (deploy target: Expo/EAS or direct)",
+  "private": true,
+  "scripts": {}
+}
