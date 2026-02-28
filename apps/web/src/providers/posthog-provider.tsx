@@ -35,3 +35,24 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+/**
+ * Link a known user to their PostHog anonymous session.
+ * Call after login / auth confirmation. No-op if PostHog is not initialized.
+ */
+export function identifyUser(
+  userId: string,
+  traits?: Record<string, string>,
+): void {
+  if (!posthogKey) return;
+  posthog.identify(userId, traits);
+}
+
+/**
+ * Reset PostHog identity (call on logout).
+ * Creates a new anonymous session so subsequent events aren't linked to the old user.
+ */
+export function resetIdentity(): void {
+  if (!posthogKey) return;
+  posthog.reset();
+}

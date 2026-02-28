@@ -10,8 +10,9 @@
  */
 
 import * as Sentry from '@sentry/node';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import type { PlaybookEntry, AdminUser } from '@playbook/shared-types';
+import { createUserContext } from '@playbook/shared-llm';
 import { checkTokenBudget } from './rate-limiter.js';
 import { verifyTurnstileToken } from './middleware/turnstile.js';
 import { handlePromptRoutes } from './routes/prompts.js';
@@ -58,13 +59,10 @@ function parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 
-/** Extract user identifier for rate limiting: x-api-key header or IP fallback. */
+/** Extract user identifier for rate limiting — delegates to shared identity module. */
 function getUserId(req: IncomingMessage): string {
-  const apiKey = req.headers['x-api-key'];
-  if (typeof apiKey === 'string' && apiKey.length > 0) return apiKey;
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  return req.socket.remoteAddress ?? 'unknown';
+  const ctx = createUserContext(req);
+  return ctx.userId;
 }
 
 const server = createServer(async (req, res) => {

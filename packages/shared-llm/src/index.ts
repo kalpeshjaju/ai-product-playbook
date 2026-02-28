@@ -52,3 +52,21 @@ export {
   getFineTuneStatus,
 } from './openpipe/index.js';
 export type { TrainingEntry, FineTuneStatus } from './openpipe/index.js';
+
+// ─── Tier 1: Output Guardrails (§21) ────────────────────────────────────────
+export { scanOutput, RegexScanner, LlamaGuardScanner } from './guardrails/index.js';
+export type {
+  GuardrailSeverity,
+  GuardrailFinding,
+  GuardrailResult,
+  GuardrailScanner,
+  ScanConfig,
+} from './guardrails/index.js';
+
+// ─── Tier 1: Identity Tracking (§21) ────────────────────────────────────────
+export {
+  createUserContext,
+  createUserContextFromValues,
+  withLangfuseHeaders,
+} from './identity/index.js';
+export type { RequestLike, UserContext, LangfuseHeaders } from './identity/index.js';
