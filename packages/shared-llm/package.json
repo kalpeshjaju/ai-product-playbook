@@ -13,7 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "jsonrepair": "^3.11.0"
+    "jsonrepair": "^3.11.0",
+    "openai": "^4.78.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

@@ -1,0 +1,43 @@
+# Promptfoo Eval Configuration
+# Docs: https://promptfoo.dev/docs/configuration/reference
+#
+# WHY: Automated prompt regression testing against LiteLLM proxy.
+#      Catches quality regressions before they reach production.
+#
+# HOW: `npx promptfoo eval` from this directory, then `npx promptfoo view`.
+#
+# PREREQS: LiteLLM proxy running (local or Railway) + LITELLM_API_KEY set.
+
+providers:
+  - id: openai:chat:claude-sonnet
+    config:
+      apiBaseUrl: ${LITELLM_PROXY_URL:-http://localhost:4000/v1}
+      apiKey: ${LITELLM_API_KEY}
+  - id: openai:chat:claude-haiku
+    config:
+      apiBaseUrl: ${LITELLM_PROXY_URL:-http://localhost:4000/v1}
+      apiKey: ${LITELLM_API_KEY}
+
+prompts:
+  - "Summarize this in one sentence: {{input}}"
+  - "Extract the key facts from this text as a JSON array: {{input}}"
+
+tests:
+  - vars:
+      input: "The quick brown fox jumps over the lazy dog. This classic pangram contains every letter of the English alphabet at least once."
+    assert:
+      - type: contains
+        value: fox
+      - type: llm-rubric
+        value: "Response is a single concise sentence"
+
+  - vars:
+      input: "LiteLLM is an open-source LLM proxy that provides a unified API for multiple LLM providers including OpenAI, Anthropic, and others. It supports load balancing, fallbacks, and cost tracking."
+    assert:
+      - type: contains-any
+        value:
+          - LiteLLM
+          - proxy
+          - LLM
+      - type: llm-rubric
+        value: "Response accurately captures the main purpose of the described tool"

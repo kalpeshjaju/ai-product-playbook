@@ -1,12 +1,15 @@
 /**
- * FILE PURPOSE: Barrel export for LLM resilience patterns
+ * FILE PURPOSE: Barrel export for LLM resilience patterns + proxy client
  *
- * WHY: Single import point for all resilience utilities.
- *      Import: `import { extractJson, costLedger, fallbackMonitor } from './resilience'`
+ * WHY: Single import point for all LLM utilities.
+ *      Import: `import { createLLMClient, extractJson, costLedger } from '@playbook/shared-llm'`
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-02-28
  */
+
+export { createLLMClient } from './llm-client.js';
+export type { OpenAI } from './llm-client.js';
 
 export { extractJson } from './json-extractor.js';
 export type { ExtractionResult } from './json-extractor.js';

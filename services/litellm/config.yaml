@@ -29,15 +29,17 @@ model_list:
       model: openai/gpt-4o-mini
       api_key: "os.environ/OPENAI_API_KEY"
 
-# ─── Callbacks (Langfuse for observability) ─────────────────────────
+# ─── LiteLLM settings ──────────────────────────────────────────────
+# Langfuse callbacks activate when LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY
+# are set on Railway. No-op otherwise (LiteLLM ignores unconfigured callbacks).
 litellm_settings:
   drop_params: true
+  cache: false
+  allow_requests_on_db_unavailable: true
   success_callback: ["langfuse"]
   failure_callback: ["langfuse"]
-  cache: false
 
 # ─── General settings ───────────────────────────────────────────────
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
-  database_url: "os.environ/DATABASE_URL"
   store_model_in_db: false
