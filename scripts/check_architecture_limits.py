@@ -1,6 +1,9 @@
 """
 Enforce architecture limits: 600 lines per file, 120 lines per function.
 
+These are CI hard gates (Playbook §2 Rule 1). CLAUDE.md keeps 400/75 as
+reviewer-enforced convention; CI enforces the outer boundary.
+
 CI fails on hard breaches. Legacy files can be allowlisted during migration
 via scripts/architecture_limits_allowlist.json.
 

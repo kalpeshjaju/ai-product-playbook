@@ -8,14 +8,22 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@playbook/shared-types": "*",
-    "@sentry/node": "^10.40.0"
+    "@sentry/node": "^10.40.0",
+    "drizzle-orm": "^0.39.0",
+    "ioredis": "^5.4.0",
+    "postgres": "^3.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "drizzle-kit": "^0.30.0",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0"
   }

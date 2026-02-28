@@ -29,12 +29,24 @@ model_list:
       model: openai/gpt-4o-mini
       api_key: "os.environ/OPENAI_API_KEY"
 
+  # ─── OpenRouter (Mercury) ─────────────────────────────────────
+  - model_name: mercury-coder
+    litellm_params:
+      model: openrouter/inception/mercury-coder-small-beta
+      api_key: "os.environ/OPENROUTER_API_KEY"
+
 # ─── LiteLLM settings ──────────────────────────────────────────────
 # Langfuse callbacks activate when LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY
 # are set on Railway. No-op otherwise (LiteLLM ignores unconfigured callbacks).
 litellm_settings:
   drop_params: true
-  cache: false
+  cache: true
+  cache_params:
+    type: "redis"
+    host: "os.environ/REDIS_HOST"
+    port: "os.environ/REDIS_PORT"
+    password: "os.environ/REDIS_PASSWORD"
+    ttl: 3600  # 1h default — conversational. Override per-route for factual (86400). §18 Semantic Caching.
   allow_requests_on_db_unavailable: true
   success_callback: ["langfuse"]
   failure_callback: ["langfuse"]

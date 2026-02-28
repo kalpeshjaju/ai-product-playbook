@@ -28,3 +28,16 @@ export interface AdminUser {
 
 /** Status values shared across apps for UI consistency. */
 export type Status = 'active' | 'draft' | 'deprecated';
+
+/** A prompt version record — §20 Prompt Versioning schema. */
+export interface PromptVersion {
+  id: string;
+  prompt_name: string;
+  version: string;
+  content: string;
+  content_hash: string;
+  eval_score: number | null;
+  active_pct: number;
+  author: string;
+  created_at: string;
+}

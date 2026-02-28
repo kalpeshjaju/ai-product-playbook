@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy package files for install
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
-COPY apps/api/package.json apps/api/tsconfig.json apps/api/
+COPY apps/api/package.json apps/api/tsconfig.json apps/api/drizzle.config.ts apps/api/
 COPY packages/shared-types/package.json packages/shared-types/tsconfig.json packages/shared-types/
 COPY packages/shared-llm/package.json packages/shared-llm/tsconfig.json packages/shared-llm/
 

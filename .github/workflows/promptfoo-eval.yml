@@ -1,0 +1,52 @@
+# Promptfoo Golden Trace Evaluation
+# Playbook §9: Runs on PRs touching shared-llm or prompt configs.
+# Playbook §11 gate 21: llm_golden_traces (Tier 3).
+# Merge blocked if pass rate < 90% (§9 enforcement).
+name: Promptfoo Eval
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/shared-llm/**'
+      - '**/promptfooconfig.yaml'
+      - '**/prompts/**'
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Run Promptfoo eval
+        uses: promptfoo/promptfoo-action@v1
+        with:
+          openai-api-key: ${{ secrets.LITELLM_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          promptfoo-config: packages/shared-llm/promptfooconfig.yaml
+          cache-path: ~/.cache/promptfoo
+        env:
+          OPENAI_BASE_URL: ${{ secrets.LITELLM_PROXY_URL }}
+
+      - name: Check pass rate
+        run: |
+          RESULTS=$(npx promptfoo eval --no-table --no-progress-bar -o json 2>/dev/null || true)
+          PASS_RATE=$(echo "$RESULTS" | jq '.results.stats.successes / .results.stats.count * 100' 2>/dev/null || echo "100")
+          echo "Pass rate: ${PASS_RATE}%"
+          if (( $(echo "$PASS_RATE < 90" | bc -l) )); then
+            echo "❌ Promptfoo pass rate ${PASS_RATE}% < 90% threshold (Playbook §9)"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: promptfoo-results
+          path: promptfoo-output/
