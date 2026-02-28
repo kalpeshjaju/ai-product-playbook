@@ -16,7 +16,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['packages/**/src/**/*.ts', 'apps/**/src/**/*.ts'],
+    files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
     rules: {
       // Playbook: no `any` types — use `unknown`
       '@typescript-eslint/no-explicit-any': 'error',

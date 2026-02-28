@@ -3,5 +3,23 @@
   "version": "0.1.0",
   "description": "Admin panel (deploy target: Vercel)",
   "private": true,
-  "scripts": {}
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "type-check": "tsc --noEmit",
+    "lint": "next lint --max-warnings 0"
+  },
+  "dependencies": {
+    "@playbook/shared-types": "*",
+    "@playbook/shared-ui": "*",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
 }

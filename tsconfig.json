@@ -3,6 +3,9 @@
   "references": [
     { "path": "packages/shared-types" },
     { "path": "packages/shared-ui" },
-    { "path": "packages/shared-llm" }
+    { "path": "packages/shared-llm" },
+    { "path": "apps/web" },
+    { "path": "apps/admin" },
+    { "path": "apps/api" }
   ]
 }

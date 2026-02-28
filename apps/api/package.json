@@ -2,6 +2,19 @@
   "name": "@playbook/api",
   "version": "0.1.0",
   "description": "Shared backend API (deploy target: Railway)",
+  "type": "module",
   "private": true,
-  "scripts": {}
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@playbook/shared-types": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
 }
