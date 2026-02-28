@@ -225,6 +225,40 @@ project/
 
 **Multi-LLM instruction file pattern**: CLAUDE.md is the single source of truth for all LLM coding rules, conventions, and project context. Every other tool-specific file (`.cursorrules`, `AGENTS.md`, `copilot-instructions.md`) contains only a one-line pointer: `Read CLAUDE.md for all project rules.` This prevents rule drift across tools — one file to maintain, all LLMs read the same rules.
 
+**Versioning CLAUDE.md**: The instruction file evolves as the project evolves. Treat it like code — it's tracked in git, changes are visible in diffs, and regressions are catchable.
+
+```
+RULES FOR CHANGING CLAUDE.md:
+
+1. NEVER EDIT SILENTLY
+   Every CLAUDE.md change gets its own commit with a clear message:
+   ✅ "chore: update CLAUDE.md — add streaming response conventions"
+   ❌ Buried in a feature commit alongside code changes
+
+2. VERSION HEADER (optional but recommended for mature projects)
+   Add at the top of CLAUDE.md:
+   <!-- CLAUDE.md v3 | Last updated: 2026-02-28 | Changed by: Claude -->
+   This lets any LLM quickly check if it's reading a stale cached version.
+
+3. WHEN TO UPDATE
+   ├── New convention established (e.g., "always use server actions for mutations")
+   ├── Tech stack changed (e.g., migrated from REST to tRPC)
+   ├── Anti-pattern discovered (add to "Never do X" section)
+   ├── New LLM tool added to the workflow (e.g., added Codex for tests)
+   └── After a post-mortem reveals a process gap
+
+4. WHEN NOT TO UPDATE
+   ├── Temporary debugging instructions (use HANDOFF.md instead)
+   ├── Task-specific context (belongs in PR description or commit message)
+   └── Rules that only one LLM needs (use tool-specific config instead)
+
+5. REVIEW CLAUDE.md QUARTERLY
+   Schedule a quarterly review: is every rule still relevant?
+   Dead rules confuse LLMs and waste context window tokens.
+```
+
+**Enforcement [DOCS ONLY]**: Git history tracks all changes. Quarterly review added to non-coder governance checklist (Section 10).
+
 **Pragmatic note from feedback**: If your existing codebase uses a different structure (layer-based, monorepo, etc.) and it works — keep it. Strong docs compensate for non-ideal structure. Don't restructure a working codebase for theoretical purity.
 
 **Custom paths**: All enforcement scripts in this playbook assume `src/features/`, `src/types/`, `docs/`. If your project uses different paths, create a `playbook.config.yaml` at the repo root:
@@ -277,6 +311,35 @@ This tells you DESIRED STATE. When code contradicts this, code is wrong.
 - When debugging: use diagnostic order (check what code actually does first). When implementing: use normative order (follow docs, then verify code matches).
 
 **Enforcement**: LLM instruction file (CLAUDE.md) includes this hierarchy. LLM eval case tests that ambiguous inputs produce clarification requests, not guesses.
+
+### When LLMs Disagree (Review Conflict Resolution)
+
+When one LLM builds and another LLM's review contradicts the approach:
+
+```
+RESOLUTION ORDER:
+
+1. CHECK NORMATIVE DOCS FIRST
+   If CONSTRAINTS.md or PRODUCT.md answers the question → docs win. Both LLMs were wrong to disagree.
+
+2. IF DOCS ARE SILENT → REVIEWER WINS (default)
+   The reviewing LLM has fresh context and distance. Maker-checker exists because
+   the maker has blind spots. Default to the reviewer unless the maker can cite
+   a specific doc, test, or benchmark that supports their approach.
+
+3. IF BOTH CITE VALID EVIDENCE → ESCALATE
+   Open a DECISIONS.md entry with both approaches, evidence, and trade-offs.
+   Non-coder or fractional CTO decides.
+   ├── Format: "DEC-NNN: [Topic] — Claude recommends A, Gemini recommends B"
+   ├── Include: benchmarks, code samples, risk analysis from each LLM
+   └── Decision owner: non-coder (product impact) or CTO (architecture impact)
+
+4. NEVER → SILENTLY IGNORE A REVIEW
+   Every review comment must be addressed: accepted, rejected with reason, or escalated.
+   Enforcement: PR template includes "Review responses" section.
+```
+
+**Anti-pattern**: LLM A builds, LLM B reviews and says "change X", LLM A ignores because it disagrees. This defeats maker-checker. If you disagree with a review, document why — don't skip it.
 
 ### Immutable Schema Evolution
 
@@ -422,6 +485,49 @@ Cursor worktrees         Native git worktree support. Each parallel    GA
 ```
 
 **Current state**: Conflict resolution is file-level locking, not semantic. True semantic conflict resolution (understanding that two changes are logically incompatible even if they touch different files) remains an open research problem. The playbook's "one active feature branch" default is the safest approach for non-coder teams.
+
+### LLM Session Handoff Protocol
+
+When one LLM stops mid-task and another picks up (e.g., Claude's context window fills, Codex takes over), context is lost unless explicitly handed off. Git commits alone are insufficient — they show *what* changed but not *where the task stands* or *what's unfinished*.
+
+```
+HANDOFF FILE: docs/HANDOFF.md (ephemeral — delete after pickup)
+
+FORMAT:
+## Handoff: [Task Name]
+**From**: Claude (session ended [reason: context limit / user switched / error])
+**To**: Next available LLM
+**Date**: YYYY-MM-DD HH:MM
+
+### Status
+- [x] Completed step 1: [what was done]
+- [x] Completed step 2: [what was done]
+- [ ] IN PROGRESS step 3: [what's partially done, where it stopped]
+- [ ] NOT STARTED step 4: [what remains]
+
+### Current State
+- Branch: `feat/task-name`
+- Last commit: `abc1234` — [commit message]
+- Build status: passing / failing (if failing: [error])
+- Tests: X passing, Y failing (if failing: [which tests, why])
+
+### Context the Next LLM Needs
+- [Key decision made and why]
+- [Non-obvious thing discovered during implementation]
+- [Gotcha or trap to avoid]
+
+### Files Modified (in order of importance)
+1. `src/path/to/main-file.ts` — [what changed, why]
+2. `src/path/to/other.ts` — [what changed, why]
+```
+
+**Rules**:
+- The LLM that stops MUST create `docs/HANDOFF.md` before ending.
+- The LLM that picks up MUST read `docs/HANDOFF.md` before starting.
+- Delete the handoff file after pickup (it's ephemeral, not documentation).
+- If no handoff file exists, the picking-up LLM must reconstruct context from git log + branch diff before proceeding.
+
+**Enforcement [DOCS ONLY]**: CLAUDE.md instructs LLMs to create handoff files. LLM eval case tests that context-limited sessions produce handoff notes.
 
 ### The Feature Module Pattern
 
@@ -1439,6 +1545,45 @@ Alt      Portkey                  50+ AI guardrails + routing +       Free: 10K 
 
 **For your stack (Railway)**: LiteLLM Proxy + Langfuse self-hosted = ~$30/mo total. No per-seat fees. Unlimited usage.
 
+### Developer-Side LLM Cost Tracking
+
+The costs above cover your *product's* LLM API calls. But building with multiple LLMs has its own cost — Claude Code tokens, Cursor tokens, Codex usage, Gemini API calls for reviews. Most teams have no visibility into this.
+
+```
+WHAT TO TRACK:
+
+TOOL             WHERE TO CHECK                    TYPICAL COST
+──────────────── ──────────────────────────────── ──────────────
+Claude Code      console.anthropic.com/billing     $50-200/mo (heavy use)
+Cursor           cursor.com/settings → Usage       $20/mo (flat) + overages
+Codex            platform.openai.com/usage         $0-50/mo (usage-based)
+Gemini           console.cloud.google.com/billing  $0-20/mo (generous free tier)
+CodeRabbit       coderabbit.ai/dashboard           Free (public repos)
+
+MONTHLY DEVELOPER-SIDE COST REPORT:
+
+Store in docs/dev-cost-reports/YYYY-MM.md alongside product cost reports.
+
+## Developer LLM Costs — [Month YYYY]
+
+| Tool        | Usage        | Cost    | Notes                    |
+|-------------|-------------|---------|--------------------------|
+| Claude Code | 2.1M tokens | $157.50 | Heavy refactoring week   |
+| Cursor      | Flat plan   | $20.00  | —                        |
+| Codex       | 400K tokens | $12.00  | Used for test generation |
+| CodeRabbit  | 47 reviews  | $0.00   | Free (public repo)       |
+| **Total**   |             | $189.50 |                          |
+
+## Trend
+- Last month: $142.00
+- This month: $189.50 (+33%)
+- Reason: Major refactoring sprint
+```
+
+**Why this matters**: A solo builder can easily spend $200-500/mo on dev-side LLM tools without noticing. Tracking monthly prevents surprise bills and helps decide which tools earn their cost.
+
+**Enforcement [DOCS ONLY]**: Non-coder reviews dev-side cost report monthly alongside product cost report (Section 10). No automation — just check billing dashboards on the 1st of each month.
+
 ---
 
 ## 9. LLM Eval Harness
@@ -1885,6 +2030,43 @@ RELEASE SAFETY LANE:
 ```
 
 **Enforcement**: Pre-release guard is a shell script (`scripts/prod_release_guard.sh`) run manually or as a GitHub Action pre-deploy job. Post-deploy smoke check (`scripts/prod_smoke_check.sh`) runs automatically after deploy via platform webhook or CI workflow. Both scripts exit non-zero on failure.
+
+### Auto-Changelog from Commits
+
+LLMs produce consistent commit messages (when instructed) — which makes automated changelogs trivial. Don't write changelogs manually.
+
+```
+SETUP:
+
+1. USE CONVENTIONAL COMMITS (already required by this playbook)
+   feat: → "Features" section
+   fix:  → "Bug Fixes" section
+   docs: → "Documentation" section
+   perf: → "Performance" section
+
+2. TOOL: release-please (Google, free)
+   ├── GitHub Action that reads conventional commits
+   ├── Auto-generates CHANGELOG.md on every merge to main
+   ├── Auto-creates GitHub Releases with release notes
+   ├── Auto-bumps version in package.json (semver)
+   └── Zero config for standard setups
+
+   Alternative: changelogen (unjs, lighter, npm-based)
+   ├── npx changelogen --release
+   └── Good for projects that don't want GitHub Actions
+
+3. WORKFLOW:
+   LLM commits with conventional prefix → merge to main →
+   release-please opens a "Release PR" with CHANGELOG updates →
+   non-coder merges Release PR → GitHub Release created automatically
+
+4. WHAT THE NON-CODER SEES:
+   A PR titled "chore(main): release v1.2.0" with a human-readable
+   list of changes. Merge it = publish the release. Ignore it = batch
+   more changes before releasing.
+```
+
+**Enforcement [SOFT CHECK]**: CI warns if a commit message doesn't follow conventional format. `commitlint` + `@commitlint/config-conventional` in a pre-commit hook or CI step.
 
 ---
 
@@ -3780,6 +3962,11 @@ This is why the playbook's enforcement principle exists: every claim of "done" m
 3. **Non-coder governance framework** — No product category exists for non-technical stakeholders to manage quality, track risk, and make informed decisions about AI-built products.
 4. **Conflict Resolution Order** — No tool enforces a hierarchy of truth when docs contradict each other.
 5. **Integrated playbook** — No single tool or platform covers all 19 sections.
+6. **Single-source-of-truth instruction files** — CLAUDE.md as master, .cursorrules/AGENTS.md as pointers. No tool enforces this pattern (Section 2).
+7. **LLM review conflict resolution** — When maker and checker disagree, no tool arbitrates. Process defined in Section 2.
+8. **Session handoff protocol** — No tool captures "where I left off" for the next LLM. Handoff format defined in Section 2.
+9. **Developer-side cost tracking** — No tool aggregates spend across Claude Code + Cursor + Codex + Gemini. Manual tracking template in Section 8.
+10. **Auto-changelog from LLM commits** — Conventional commits + release-please. Tools exist but no playbook integrates them into the LLM workflow (Section 11).
 
 The playbook's approach — docs as memory, automation as enforcement, layered defense — aligns with how the most sophisticated engineering orgs (Stripe, Uber, Google) are solving this problem at scale.
 
@@ -3975,7 +4162,8 @@ Embedding re-indexing budget as line item      Infra budget / ARCHITECTURE.md
 
 ---
 
-**Version**: 6.0.0
+**Version**: 6.1.0
 **Status**: Final
-**Incorporates**: v5.1 + Fourth pillar: INPUT (Data Ingestion & Living Inputs, Section 19) — multi-modal parsing (voice, documents, images, structured data, web, APIs, real-time streams) + embedding model versioning + semantic deduplication + data freshness gating + enrichment resilience + chunking strategy + voice as first-class input modality + ingestion reference stack + 10 new rules in Appendix D
+**Incorporates**: v6.0.0 + Multi-LLM collaboration gaps: single-source-of-truth instruction files (CLAUDE.md + pointers), LLM review conflict resolution, session handoff protocol, auto-changelog from conventional commits, developer-side LLM cost tracking, CLAUDE.md versioning guidance. 5 new entries in "What No Tool Solves" (Appendix B).
+**Previous**: v6.0.0 — v5.1 + Fourth pillar: INPUT (Data Ingestion & Living Inputs, Section 19)
 **Validation**: See `docs/PLAYBOOK-VALIDATION-REPORT.md` for full section-by-section validation with sources
