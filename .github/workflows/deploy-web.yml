@@ -2,7 +2,7 @@
 # FILE PURPOSE: Deploy web app to Vercel on push to main
 #
 # WHY: Path-filtered deploys — only deploys when web app or shared packages change.
-# HOW: Vercel CLI deploy. Stack TBD (placeholder until framework chosen).
+# HOW: Vercel CLI deploy from monorepo root with turbo-filtered build.
 #
 # AUTHOR: Claude Opus 4.6
 # LAST UPDATED: 2026-02-28
@@ -26,8 +26,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Uncomment when Vercel is configured:
-    # environment: production
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,15 +38,18 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci --legacy-peer-deps
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
 
-      - name: Build shared packages
-        run: npx turbo run build --filter=@playbook/web...
+      - name: Pull Vercel config
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      # Uncomment when Vercel is configured:
-      # - name: Deploy to Vercel
-      #   run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
-      #   working-directory: apps/web
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Placeholder
-        run: echo "Web deploy pipeline ready — configure Vercel when framework is chosen"
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed to: $URL"
