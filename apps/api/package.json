@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@playbook/shared-types": "*"
+    "@playbook/shared-types": "*",
+    "@sentry/node": "^10.40.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

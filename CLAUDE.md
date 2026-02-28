@@ -7,7 +7,7 @@
 
 - **What**: Tools and products built around the LLM-Maintained Enterprise Playbook
 - **Owner**: Kalpesh Jaju
-- **Stack**: TBD (will be defined as we build)
+- **Stack**: See `docs/MOAT-STACK-SETUP.md` for the moat stack (Promptfoo, Composio, Inception, Langfuse, LiteLLM, prompt versioning + A/B).
 
 ## Rules
 

@@ -9,8 +9,20 @@
  * LAST UPDATED: 2026-02-28
  */
 
+import * as Sentry from '@sentry/node';
 import { createServer } from 'node:http';
 import type { PlaybookEntry, AdminUser } from '@playbook/shared-types';
+
+// Sentry — no-op when DSN not set
+const sentryDsn = process.env.SENTRY_DSN;
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: process.env.NODE_ENV ?? 'production',
+    tracesSampleRate: 0.2,
+    sendDefaultPii: false,
+  });
+}
 
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
 

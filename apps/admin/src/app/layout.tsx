@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PostHogProvider } from '../providers/posthog-provider';
 
 export const metadata: Metadata = {
   title: 'Admin Panel',
@@ -8,7 +9,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }
