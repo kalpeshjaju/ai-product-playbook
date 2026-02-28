@@ -75,5 +75,8 @@ else
   echo "⚠️  $WARNINGS warning(s) — review above and update docs if needed"
 fi
 
-# Warn only, don't block (soft check)
+# Hard gate — block when warnings found
+if [ "$WARNINGS" -gt 0 ]; then
+  exit 1
+fi
 exit 0

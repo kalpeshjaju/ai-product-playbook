@@ -7,9 +7,10 @@
  *      Promotion flow: 0% → 10% → 50% → 100% (§22).
  *
  * Routes:
- *   GET  /api/prompts/:name/active  — get active version (weighted random)
- *   POST /api/prompts               — create new version (starts at 0% traffic)
- *   PATCH /api/prompts/:id/traffic  — update traffic allocation
+ *   GET  /api/prompts/:name/active   — get active version (weighted random)
+ *   POST /api/prompts                — create new version (starts at 0% traffic)
+ *   PATCH /api/prompts/:id/traffic   — update traffic allocation
+ *   POST /api/prompts/:name/promote  — automated promotion ladder
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-02-28
@@ -168,6 +169,102 @@ export async function handlePromptRoutes(
       .returning();
 
     res.end(JSON.stringify(updated));
+    return;
+  }
+
+  // POST /api/prompts/:name/promote
+  const promoteMatch = url.match(/^\/api\/prompts\/([^/]+)\/promote$/);
+  if (promoteMatch && req.method === 'POST') {
+    const promptName = decodeURIComponent(promoteMatch[1]!);
+    const body = await parseBody(req);
+    const version = body.version as string | undefined;
+
+    if (!version) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: 'Required: version' }));
+      return;
+    }
+
+    // Find the specified version
+    const [target] = await db
+      .select()
+      .from(promptVersions)
+      .where(eq(promptVersions.promptName, promptName))
+      .where(eq(promptVersions.version, version))
+      .limit(1);
+
+    if (!target) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: `No version ${version} found for prompt: ${promptName}` }));
+      return;
+    }
+
+    // Promotion ladder: 0 → 10 → 50 → 100
+    const ladder = [0, 10, 50, 100];
+    const currentIdx = ladder.indexOf(target.activePct);
+    const previousPct = target.activePct;
+
+    if (currentIdx === -1) {
+      // Non-standard percentage — snap to next ladder step above current
+      const nextStep = ladder.find(s => s > target.activePct);
+      if (!nextStep) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: `Already at maximum traffic: ${target.activePct}%` }));
+        return;
+      }
+    }
+
+    if (target.activePct >= 100) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: 'Already at 100% — fully promoted' }));
+      return;
+    }
+
+    // Determine next step
+    let newPct: number;
+    if (currentIdx !== -1 && currentIdx < ladder.length - 1) {
+      newPct = ladder[currentIdx + 1]!;
+    } else {
+      newPct = ladder.find(s => s > target.activePct) ?? 100;
+    }
+
+    // Quality gate: eval_score >= 0.70 required to promote beyond 10%
+    if (newPct > 10) {
+      const evalScore = target.evalScore ? parseFloat(target.evalScore) : null;
+      if (evalScore === null || evalScore < 0.70) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({
+          error: `Quality gate: eval_score ${evalScore?.toFixed(2) ?? 'null'} < 0.70 required for promotion beyond 10%`,
+        }));
+        return;
+      }
+    }
+
+    // At 100%: set all other versions of same prompt to 0%
+    if (newPct === 100) {
+      await db
+        .update(promptVersions)
+        .set({ activePct: 0 })
+        .where(eq(promptVersions.promptName, promptName));
+    }
+
+    // Set this version to the new percentage
+    await db
+      .update(promptVersions)
+      .set({ activePct: newPct })
+      .where(eq(promptVersions.id, target.id));
+
+    const nextStep = newPct >= 100
+      ? 'Fully promoted — all other versions set to 0%'
+      : `Promote again to reach ${ladder[ladder.indexOf(newPct) + 1] ?? 100}%`;
+
+    res.end(JSON.stringify({
+      promptName,
+      version,
+      previousPct,
+      newPct,
+      nextStep,
+    }));
     return;
   }
 

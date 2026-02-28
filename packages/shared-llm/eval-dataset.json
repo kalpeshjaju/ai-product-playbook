@@ -1,0 +1,62 @@
+[
+  {
+    "input": "Classify this job posting: Senior React Developer needed for fintech startup",
+    "expected": "technology",
+    "taskType": "classification",
+    "difficulty": "easy"
+  },
+  {
+    "input": "Classify this job posting: Head of Marketing for consumer wellness brand",
+    "expected": "marketing",
+    "taskType": "classification",
+    "difficulty": "easy"
+  },
+  {
+    "input": "Classify this job posting: Data Engineer with Spark and Airflow experience for healthcare analytics",
+    "expected": "technology",
+    "taskType": "classification",
+    "difficulty": "medium"
+  },
+  {
+    "input": "Extract skills from: Looking for someone with Python, SQL, and machine learning experience",
+    "expected": "python, sql, machine learning",
+    "taskType": "extraction",
+    "difficulty": "easy"
+  },
+  {
+    "input": "Extract skills from: Must have 5+ years in React, TypeScript, GraphQL, and CI/CD pipelines. Nice to have: Kubernetes, Terraform",
+    "expected": "react, typescript, graphql, ci/cd, kubernetes, terraform",
+    "taskType": "extraction",
+    "difficulty": "medium"
+  },
+  {
+    "input": "Extract skills from: Seeking a product manager with stakeholder management, roadmap planning, and agile methodology expertise",
+    "expected": "stakeholder management, roadmap planning, agile",
+    "taskType": "extraction",
+    "difficulty": "medium"
+  },
+  {
+    "input": "Score this candidate-job match: React developer applying for React lead position",
+    "expected": "high",
+    "taskType": "scoring",
+    "difficulty": "easy"
+  },
+  {
+    "input": "Score this candidate-job match: Junior Python developer applying for Senior Rust systems engineer",
+    "expected": "low",
+    "taskType": "scoring",
+    "difficulty": "easy"
+  },
+  {
+    "input": "Score this candidate-job match: Full-stack developer with 3 years React and Node.js applying for frontend architect role requiring 7+ years",
+    "expected": "medium",
+    "taskType": "scoring",
+    "difficulty": "hard"
+  },
+  {
+    "input": "Classify this job posting: VP of Engineering for Series B AI startup, must have scaled teams from 10 to 50+",
+    "expected": "technology",
+    "taskType": "classification",
+    "difficulty": "hard"
+  }
+]

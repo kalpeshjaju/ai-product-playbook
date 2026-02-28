@@ -60,6 +60,23 @@ jobs:
       - name: Check doc freshness
         run: bash scripts/check_doc_freshness.sh --base ${{ github.event.pull_request.base.ref || 'main' }}
 
+      # Rate limit enforcement (§18)
+      - name: Check rate limiting
+        run: bash scripts/check-rate-limit.sh
+
+      # Destructive SQL detection
+      - name: Check destructive SQL
+        run: bash scripts/check-destructive-sql.sh
+
+      # API contracts documentation check
+      - name: Check API contracts
+        run: bash scripts/check-api-contracts.sh
+
+      # PR template enforcement (PR-only)
+      - name: Check PR template
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-pr-template.sh
+
       # Hallucination detection
       - name: Hallucination check
         if: github.event_name == 'pull_request'
