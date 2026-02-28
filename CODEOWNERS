@@ -1,0 +1,12 @@
+# Decision authority enforcement
+# See: LLM-MAINTAINED-ENTERPRISE-PLAYBOOK.md Section 1B
+
+# Business docs — non-coder (owner) must approve
+docs/PRODUCT.md       @kalpeshjaju
+docs/CONSTRAINTS.md   @kalpeshjaju
+
+# Deployment and CI — require explicit approval
+.github/workflows/    @kalpeshjaju
+scripts/deploy*       @kalpeshjaju
+
+# Everything else — auto-approved if all CI gates pass

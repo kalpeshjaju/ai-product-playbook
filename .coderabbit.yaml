@@ -1,0 +1,24 @@
+language: en-US
+reviews:
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "**/*.py"
+      instructions: "No print() in production. Use logging. No bare except. Files < 600 lines."
+    - path: "**/*.ts"
+      instructions: "No any types (use unknown). No console.log. No commented-out code."
+    - path: "**/*.tsx"
+      instructions: "No any types (use unknown). No console.log. No commented-out code."
+    - path: "scripts/**"
+      instructions: "Scripts must be idempotent and exit non-zero on failure."
+    - path: "docs/**"
+      instructions: "Check factual accuracy. Flag stale dates or broken links."
+chat:
+  auto_reply: true
+tone_instructions: >
+  Direct and technical. Flag hallucination risks (phantom imports, fabricated APIs).
+  Multi-LLM codebase — different AIs write and review code.

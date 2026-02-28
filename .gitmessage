@@ -1,0 +1,20 @@
+
+# <type>: <subject> (max 70 chars)
+#
+# Types: feat | fix | refactor | test | docs | deploy | security | perf
+#
+# ## Changes
+# - [What changed and why]
+#
+# ## Tech Stack (Verified YYYY-MM-DD)
+# - [List relevant tech versions]
+#
+# ## Confidence: [LEVEL] (0.XX)
+# Reason: [Why this score]
+# Levels: VERIFIED (0.95) | HIGH (0.85) | MEDIUM (0.70) | LOW (0.40) | UNCERTAIN (0.20)
+#
+# ## For Future LLMs
+# - [Key context for next session]
+# - [Files that need attention]
+#
+# Co-Authored-By: Claude <noreply@anthropic.com>
