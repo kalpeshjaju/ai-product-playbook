@@ -1,0 +1,6 @@
+{
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npx turbo run build --filter=@playbook/admin",
+  "outputDirectory": "apps/admin/.next",
+  "framework": "nextjs"
+}

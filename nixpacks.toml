@@ -1,0 +1,12 @@
+# Force Node.js detection for Railway (monorepo root has pyproject.toml which confuses auto-detect)
+[phases.setup]
+nixPkgs = ["nodejs_22", "npm-9_x"]
+
+[phases.install]
+cmds = ["npm install --legacy-peer-deps"]
+
+[phases.build]
+cmds = ["npx turbo run build --filter=@playbook/api"]
+
+[start]
+cmd = "node apps/api/dist/server.js"
