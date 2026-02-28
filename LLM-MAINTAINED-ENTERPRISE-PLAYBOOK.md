@@ -1477,6 +1477,45 @@ TOOL REGISTRY PATTERN:
 
 **Enforcement [HARD GATE]**: Tool registry enforces allowlist at runtime. Any tool call not in the agent's allowlist returns an authorization error and logs the attempt. Allowlist configuration files are protected via CODEOWNERS.
 
+### LLM Output Guardrails (v6.4 addition)
+
+Every user-facing LLM response must pass through at least one guardrail layer before reaching the user. Guardrails validate output for safety (prompt injection, toxic content, PII leakage), factual grounding, and format compliance.
+
+```
+TOOL                    TYPE         WHAT IT DOES                                        COST (Feb 2026)
+──────────────────────  ───────────  ──────────────────────────────────────────────────  ───────────────
+LlamaFirewall (Meta)    OSS          3-layer defense: PromptGuard 2 (input scanner),    Free
+                                     Agent Alignment Checker (tool-call auditor),
+                                     CodeShield (code output scanner). Plug-and-play
+                                     with any model provider.
+
+Guardrails AI           OSS          Python validator framework. 50+ built-in validators Free
+                                     (PII, toxicity, hallucination, SQL injection).
+                                     Composes validators into pipelines. Works with
+                                     LiteLLM, OpenAI, Anthropic SDKs.
+
+Portkey Guardrails      SaaS         Gateway-level guardrails (runs before/after LLM).   $49/mo
+                                     No SDK changes needed — intercepts at proxy layer.
+                                     Built-in: PII redaction, topic restriction,
+                                     content moderation, regex patterns.
+```
+
+**Decision framework**: Use LlamaFirewall for self-hosted, model-agnostic defense. Use Guardrails AI when you need custom Python validators integrated into your application code. Use Portkey when you want gateway-level enforcement without code changes.
+
+**Enforcement [HARD GATE]**: All user-facing LLM output must pass through at least one guardrail layer. CI lints for this pattern:
+
+```bash
+# scripts/check-guardrails.sh
+# Verify all user-facing LLM responses pass through guardrails
+for f in $(grep -rl 'streamText\|generateText\|llm.chat' src/ --include='*.ts'); do
+  if ! grep -q 'guardrail\|firewall\|validate_output\|GuardrailsAI' "$f"; then
+    echo "❌ $f returns LLM output without guardrail check"
+    exit 1
+  fi
+done
+echo "✅ All user-facing LLM outputs pass through guardrails"
+```
+
 ---
 
 ## 8. Ops Discipline
@@ -2119,6 +2158,22 @@ WHY 3 BUGS, NOT MORE:
 ```
 
 **Enforcement [SOFT CHECK]**: Monthly scheduled CI job (GitHub Actions `schedule: cron: '0 9 1 * *'`). Results appended to `docs/DRILLS.md`. If catch rate < 50% for 2 consecutive months, the CI job creates a GitHub Issue tagged `test-gap` and assigns it to the repository owner.
+
+### Eval & Optimization Tool Roster (v6.4 addition)
+
+The eval ecosystem has matured beyond Promptfoo alone. This roster covers the full spectrum from CI evals to automated prompt optimization.
+
+| Tool | Role | When to Use | Cost |
+|------|------|-------------|------|
+| **Promptfoo** (primary) | Red-teaming, CI evals, golden traces, LLM-as-a-judge | Default for all teams. Start here. | Free (MIT) |
+| **Braintrust** | CI/CD deployment blocking, auto-scoring, statistical significance | When you need merge blocking with confidence intervals (50+ eval cases) | Free tier / $249/mo |
+| **DSPy** (Stanford) | Automated prompt optimization, prompts-as-code | When manual prompt iteration shows diminishing returns (see Section 20) | Free (MIT) |
+| **DeepEval** | Pytest-integrated LLM eval metrics | When your team prefers pytest-style eval workflows over YAML configs | Free (MIT) |
+| **RAGAS** | RAG-specific eval: faithfulness, relevancy, context recall | When you have a RAG pipeline and need to measure retrieval quality | Free (Apache 2.0) |
+
+**The DSPy paradigm shift**: DSPy treats prompts as optimizable programs, not hand-crafted strings. Instead of manually versioning prompts (Section 20), DSPy compiles a high-level spec into optimized prompts using labeled examples and a metric function. This doesn't replace prompt versioning — it augments it. Use DSPy to discover better prompts, then deploy the winners through your prompt versioning pipeline. See Section 20 for integration pattern.
+
+**Recommendation**: Start with Promptfoo (CI evals) + RAGAS (if using RAG). Add Braintrust when your eval suite is large enough to need statistical blocking. Add DSPy when manual prompt engineering plateaus. DeepEval is a lateral alternative to Promptfoo if your team is pytest-native.
 
 ---
 
@@ -3809,6 +3864,30 @@ complex_tasks:  everything else → Opus
 
 **Expected savings**: 30-50% cost reduction vs. using Opus for everything. Actual savings depend on your task distribution.
 
+#### Intelligent Routing Tools (v6.4 addition)
+
+The static routing table above works for simple task classification. For dynamic, per-query routing that learns from your traffic patterns, use ML-based routers:
+
+```
+TOOL                    TYPE         WHAT IT DOES                                        COST
+──────────────────────  ───────────  ──────────────────────────────────────────────────  ──────
+RouteLLM (LMSYS)        OSS          Strategy-based routing (MF, BERT, causal LM).       Free
+                                     Trained on Chatbot Arena preference data.
+                                     Plugs into LiteLLM as a custom router.
+
+Martian                 SaaS         ML-based per-query routing. Selects optimal model    Paid
+                                     per request based on query complexity, cost target,
+                                     and latency requirement. Accenture-backed.
+
+Not Diamond             SaaS         Automatic model selection per query. Routes across   Paid
+                                     20+ models. Claims 19% accuracy improvement over
+                                     best single model at lower cost.
+```
+
+**Integration pattern**: Layer these on top of LiteLLM. Route simple queries to Haiku/Mercury, complex reasoning to Opus/GPT-4o. Potential 40-60% cost reduction beyond static routing, depending on query distribution.
+
+**When to adopt**: After you have 10,000+ LLM calls/day and can measure cost savings. Below that volume, static routing (above) is sufficient.
+
 **Enforcement [HARD GATE]**: Application code must specify a `task_type` parameter on every LLM call. The gateway uses this to route. Calls without `task_type` default to the cheapest model (fail-safe, not fail-expensive):
 
 ```python
@@ -3835,7 +3914,25 @@ Without semantic cache: 3 LLM calls ($0.15)
 With semantic cache:    1 LLM call + 2 cache hits ($0.05 + $0.00) = 67% savings
 ```
 
-**Implementation**: LiteLLM supports semantic caching via Redis + embeddings. Alternatively, use GPTCache (open source) or Portkey (managed).
+```
+SEMANTIC CACHING TOOL ROSTER (v6.4 addition):
+
+TOOL                       TYPE         WHAT IT DOES                                      COST
+─────────────────────────  ───────────  ────────────────────────────────────────────────  ──────
+Redis LangCache            Managed      Redis-native semantic cache. 15x faster lookups,  Free tier
+                                        70% token cost reduction reported. Vector
+                                        similarity built into Redis Stack.
+
+Upstash Semantic Cache     Serverless   Serverless semantic cache with auto-scaling.       Free tier
+                                        No infrastructure to manage. REST API.
+                                        Pay-per-request pricing at scale.
+
+GPTCache                   OSS          Modular caching framework. Pluggable embedding,    Free
+                                        storage, and similarity backends. Self-hosted.
+                                        Good for custom caching strategies.
+```
+
+**Implementation**: LiteLLM supports semantic caching via Redis + embeddings. For managed options, use Redis LangCache (best performance) or Upstash (simplest setup). GPTCache for maximum customization.
 
 **Cache invalidation**: Set TTL to 1 hour for conversational responses, 24 hours for factual/policy responses. Bust cache when source documents change.
 
@@ -3921,6 +4018,7 @@ App error tracking      Sentry                  Error grouping, stack traces   F
 LLM token/cost metrics  Langfuse (self-hosted)  Prompt traces, cost per call   Free (self-host)
 LLM quality scoring     Langfuse + Promptfoo    Eval scores tracked over time  Free
 LLM cache metrics       LiteLLM dashboard       Hit rate, savings, latency     Free
+CI/CD eval blocking     Braintrust              Merge blocking with stat sig   $249/mo
 User analytics          PostHog (self-hosted)   Funnels, feature flag usage    Free <1M events
 Uptime monitoring       Better Uptime            Ping + status page             Free (basic)
 ```
@@ -4027,6 +4125,34 @@ PATTERN 3: PER-RUN COST TELEMETRY                                      [HARD GAT
   ENFORCEMENT: Every agent/pipeline entry point logs a cost summary on completion.
   Langfuse traces group by run_id. Alert if any single run exceeds $X threshold.
 ```
+
+### Structured Output (v6.4 addition)
+
+Getting LLMs to return valid, typed data is the most common production pain point. These tools guarantee structural correctness at generation time — eliminating the need for multi-strategy JSON extraction in most cases.
+
+```
+TOOL                    TYPE         WHAT IT DOES                                        COST
+──────────────────────  ───────────  ──────────────────────────────────────────────────  ──────
+Instructor              OSS (Python) Pydantic-based structured output for any provider.  Free
+                                     Works with LiteLLM, OpenAI, Anthropic, Cohere.
+                                     Automatic retries on validation failure. Streaming
+                                     support. Most popular structured output library.
+
+XGrammar               OSS (C++)    Constrained decoding engine — enforces grammar at    Free
+                                     token generation level (not post-hoc parsing).
+                                     100x speedup over regex-based constraining.
+                                     Integrated into vLLM 0.7+ and SGLang.
+
+Outlines                OSS (Python) Grammar-guided generation for local/self-hosted      Free
+                                     models. JSON Schema, regex, and CFG constraints.
+                                     Best for HuggingFace / vLLM deployments.
+```
+
+**Decision framework**: Use **Instructor** for API-based models (OpenAI, Anthropic, LiteLLM) — it's the simplest path to reliable structured output. Use **XGrammar** (via vLLM) or **Outlines** when self-hosting models and need token-level constraining for maximum reliability.
+
+**Migration note**: Instructor replaces multi-strategy JSON extraction (Pattern 4 below) for new code. Pattern 4 remains valid as a fallback for legacy providers that don't support structured output natively.
+
+**Enforcement [SOFT CHECK]**: New LLM integration code should use Instructor or equivalent structured output library. CI warns if `JSON.parse()` is called directly on LLM output without a structured output wrapper.
 
 ### LLM Response Resilience Patterns (v6.2 addition)
 
@@ -4784,6 +4910,65 @@ done
 echo "✅ All LLM calls use context injection"
 ```
 
+### Agent Memory & State Management (v6.4 addition)
+
+Context injection (above) builds context per-request. Agent memory persists context across sessions — enabling agents to remember user preferences, past interactions, and evolving relationships without re-retrieving everything.
+
+```
+TOOL                    TYPE         WHAT IT DOES                                        COST
+──────────────────────  ───────────  ──────────────────────────────────────────────────  ──────
+Mem0                    OSS + Cloud  Graph memory with per-user entity extraction.        Free (OSS)
+                                     Automatically builds user preference graphs from     $99/mo (cloud)
+                                     conversations. REST API. Works with any model.
+
+Zep                     OSS + Cloud  Temporal knowledge graphs via Graphiti engine.       Free (OSS)
+                                     Episodic memory (remembers conversation flow).       Paid (cloud)
+                                     Entity + relationship extraction with timestamps.
+                                     Best for "when did the user say X?" queries.
+
+Letta (MemGPT)          OSS          Stateful agent runtime with context repositories.   Free
+                                     Manages its own memory hierarchy (core/archival).
+                                     Agents persist state across sessions natively.
+                                     Best for full stateful agent architectures.
+```
+
+**Decision framework**: Use **Mem0** for lightweight per-user preference graphs (simple integration, fast time-to-value). Use **Zep** when temporal recall matters ("the user changed their salary preference last week"). Use **Letta** for full stateful agent architectures where the agent manages its own memory hierarchy.
+
+**Integration with Layer 4 (Personalization)**: These tools augment the `getUserPreferences()` call in the context injection pattern above. Instead of storing preferences in a flat PostgreSQL table, the memory layer builds a rich graph of user entities and relationships that improves with each interaction.
+
+**When to adopt**: After you have repeat users with 10+ interactions each. Before that, a simple `user_preferences` table (Section 21) is sufficient.
+
+### Fine-Tuning Pipeline (v6.4 addition)
+
+Fine-tuning creates a smaller, cheaper model that matches or exceeds your prompted large model for a specific task. The tools below handle the pipeline from data collection to deployment.
+
+```
+TOOL                    TYPE         WHAT IT DOES                                        COST
+──────────────────────  ───────────  ──────────────────────────────────────────────────  ──────
+OpenPipe                SaaS         Captures production LLM traffic → fine-tunes         Paid
+                                     smaller models → replaces expensive models.
+                                     Drop-in replacement: same API, lower cost.
+                                     Automatic dataset curation from logged calls.
+
+Predibase               SaaS         Reinforcement fine-tuning (RFT). Gets results        Paid
+                                     with as few as 10 labeled examples. LoRA-based
+                                     serving (multiple fine-tunes on shared base).
+                                     Best for teams with limited labeled data.
+
+Together AI             SaaS         Managed fine-tuning + inference. Supports Llama,     Paid
+                                     Mixtral, and custom models. Built-in eval after
+                                     fine-tuning. Competitive inference pricing.
+```
+
+**Gate [HARD GATE]**: Do NOT fine-tune until you have ALL of these:
+1. **1,000+ labeled examples** in `ai_generations` with quality scores and user feedback
+2. **Eval scores proving prompt engineering has plateaued** — at least 3 prompt versions with no significant improvement
+3. **Cost justification** showing fine-tuned model saves >50% vs. current prompted model at equivalent quality
+
+**Why this gate exists**: Fine-tuning is expensive (compute + ongoing maintenance), creates model lock-in, and requires continuous retraining as your domain evolves. Most teams get 80% of the benefit from better prompts + few-shot examples (Layer 2) at zero marginal cost.
+
+**The OpenPipe flywheel**: Log all production LLM calls → filter for high-quality responses (user accepted, quality_score > 0.8) → fine-tune a smaller model on this curated dataset → deploy as a drop-in replacement → repeat monthly. This is the production-to-fine-tuning loop that creates a real cost moat (cross-ref Section 22).
+
 ### Prompt Versioning
 
 Prompts are code. They need versioning, A/B testing, and rollback — just like any other deployment artifact.
@@ -4813,6 +4998,26 @@ PROMOTION FLOW:
 ```
 
 **Enforcement [SOFT CHECK]**: CI warns if prompt strings are hardcoded in application code instead of loaded from the prompt version table. Prompts in code are acceptable only in tests and development scripts.
+
+### Automated Prompt Optimization (v6.4 addition)
+
+Manual prompt engineering — writing, testing, tweaking, versioning — is the default approach. But when you've iterated through 5+ prompt versions with diminishing returns, algorithmic optimization can find improvements humans miss.
+
+**DSPy** (Stanford) treats prompts as programs with optimizable parameters. You define:
+1. A **signature** (input/output spec, e.g., `question → answer`)
+2. A **metric function** (e.g., accuracy against labeled examples)
+3. An **optimizer** (e.g., `BootstrapFewShotWithRandomSearch`, `MIPROv2`)
+
+DSPy then automatically generates and evaluates prompt variations — including few-shot example selection, instruction phrasing, and chain-of-thought structure — to maximize your metric.
+
+**Integration pattern**: DSPy optimizers → produce winning prompt → deploy through Promptfoo eval pipeline → promote via prompt versioning table (above). DSPy finds the prompt; your existing infrastructure deploys and monitors it.
+
+**When to use**:
+- Manual prompt iteration shows diminishing returns (3+ versions, <2% improvement)
+- You have 50+ labeled examples for the metric function
+- The task is well-defined enough to express as a DSPy signature
+
+**When NOT to use**: Open-ended creative tasks (chat, brainstorming) where "better" is subjective and hard to metric-ify.
 
 ### When NOT to Build This Stack
 
@@ -5527,6 +5732,18 @@ const analysis = await db.$queryRaw`
 `;
 ```
 
+### Moat Acceleration Tools (v6.4 addition)
+
+These tools accelerate specific parts of the data flywheel. They're "add when you need them" — not required at launch, but high-leverage when the flywheel is spinning.
+
+- **Gretel / Tonic** — Synthetic data generation. Use when your eval dataset is too small to be statistically significant (< 500 examples). Gretel (NVIDIA-backed) generates privacy-safe synthetic data from real samples. Tonic.ai specializes in production-realistic test data. Neither replaces real user data for fine-tuning, but both scale eval datasets 10-50x.
+
+- **OpenPipe** — Production-to-fine-tuning flywheel. Captures production traffic, curates high-quality examples, fine-tunes smaller models to replace expensive ones. The cost moat: every production interaction makes your fine-tuned model cheaper and better. Cross-ref: Fine-Tuning Pipeline in Section 20.
+
+- **Qodo Cover** — AI test generation for coverage gaps. Analyzes your codebase, identifies untested paths, and generates meaningful tests (not just line-coverage padding). Use when chaos test catch rate (Section 9) reveals systematic gaps. Free for open source.
+
+**When to adopt**: Gretel/Tonic when eval datasets are the bottleneck. OpenPipe when Opus/Sonnet costs exceed $1K/month and you have enough production data to fine-tune. Qodo Cover when your test catch rate is consistently below 66%.
+
 ### Moat Health Dashboard
 
 Monthly metrics that tell you whether your moat is growing or stagnating.
@@ -5672,6 +5889,18 @@ AI quality logging         PostgreSQL (ai_generations)  Langfuse (self-hosted)  
 Outcome tracking           PostgreSQL (outcomes table)  Custom                      Free
 User preference learning   PostgreSQL + batch jobs      Custom                      Free
 Data flywheel analysis     PostgreSQL + SQL             Metabase (self-hosted)      Free
+LLM output guardrails      LlamaFirewall (Meta)         Guardrails AI               Free
+Structured output          Instructor                   Outlines                    Free
+Constrained decoding       XGrammar (via vLLM)          SGLang                      Free
+Intelligent routing        RouteLLM (LMSYS)             Martian, Not Diamond        Free / Paid
+Semantic caching           Redis LangCache              Upstash Semantic Cache      Free tier
+Agent memory               Mem0                         Zep, Letta                  Free tier
+Prompt optimization        DSPy (Stanford)              OPRO (DeepMind)             Free
+Fine-tuning pipeline       OpenPipe                     Predibase                   Paid
+Synthetic data             Gretel (NVIDIA)              Tonic.ai                    Paid
+AI test generation         Qodo Cover                   —                           Free
+CI/CD eval blocking        Braintrust                   —                           $249/mo
+RAG evaluation             RAGAS                        DeepEval                    Free
 ```
 
 **Notes**:
@@ -5742,6 +5971,20 @@ This is why the playbook's enforcement principle exists: every claim of "done" m
 | Security Guide for AI Code Instructions | OpenSSF | Aug 2025 | How to write secure CLAUDE.md/AGENTS.md files |
 | Copilot Control System | Microsoft | Nov 2025 | Enterprise governance for AI coding assistants |
 | CISO Guide to AI Code | Checkmarx | 2025 | Identifying, governing, and limiting AI code risk |
+
+### AI Tooling Landscape Shifts (v6.4)
+
+Five significant shifts in the AI tooling landscape since the playbook's last major update:
+
+1. **Guardrails emerged as a product category** — LlamaFirewall (Meta, May 2025) and Guardrails AI established output validation as a distinct infrastructure layer, not just a feature of individual tools. Every major framework now supports pre/post-generation hooks.
+
+2. **Memory-as-infrastructure matured** — Letta (MemGPT), Mem0, and Zep moved agent memory from research projects to production-ready infrastructure. Zep's Graphiti engine and Mem0's entity graphs enable persistent personalization without custom data engineering.
+
+3. **Prompt optimization shifted from manual to algorithmic** — DSPy (Stanford) proved that treating prompts as optimizable programs outperforms manual iteration for well-defined tasks. The prompts-as-code paradigm is gaining traction in production systems.
+
+4. **Model routing became ML-driven** — RouteLLM (LMSYS), Martian, and Not Diamond replaced static routing tables with learned routing that selects the optimal model per query. Early adopters report 40-60% cost reduction over single-model deployments.
+
+5. **Braintrust raised $80M Series B at $800M valuation** (Feb 2026) — signaling that LLM eval infrastructure is a venture-scale category. Their CI/CD eval blocking pattern (merge gates based on statistical significance) is becoming a best practice for teams with large eval suites.
 
 ### What No Tool Solves (This Playbook's Unique Contributions)
 
@@ -5964,8 +6207,9 @@ Prioritization strategy for timeout truncation Agent file header + ARCHITECTURE.
 
 ---
 
-**Version**: 6.3.0
+**Version**: 6.4.0
 **Status**: Final
-**Incorporates**: v6.2.0 + 4 expanded patterns from cross-project feedback review: monthly chaos test with full implementation (Section 9), prompt injection PR attack vectors with safe review pipeline (Section 7), doc freshness hallucination chain + graduated enforcement + playbook.config.yaml (Section 5), streaming-first ESLint rule config + TTFT SLO + exemption pattern (Section 16). 1 new Appendix D entry (chaos test catch rate).
+**Incorporates**: v6.3.0 + moat stack expansion (8 new tool categories, 12 new Appendix A entries). New sections: LLM Output Guardrails (Section 7), Structured Output + Intelligent Routing + Semantic Caching tool rosters (Section 18), Eval & Optimization Tool Roster (Section 9), Agent Memory & State Management + Fine-Tuning Pipeline + Automated Prompt Optimization (Section 20), Moat Acceleration Tools (Section 22), AI Tooling Landscape Shifts (Appendix B). MOAT-STACK-SETUP.md expanded from 5 to 15 tools across 3 priority tiers.
+**Previous**: v6.3.0 — v6.2.0 + 4 expanded patterns from cross-project feedback review: monthly chaos test with full implementation (Section 9), prompt injection PR attack vectors with safe review pipeline (Section 7), doc freshness hallucination chain + graduated enforcement + playbook.config.yaml (Section 5), streaming-first ESLint rule config + TTFT SLO + exemption pattern (Section 16). 1 new Appendix D entry (chaos test catch rate).
 **Previous**: v6.2.0 — v6.1.0 + 7 LLM resilience patterns from production (ui-ux-audit-tool + job-matchmaker): multi-strategy JSON extraction (Section 18), data falsification prevention with `||` (Section 18), fallback rate monitoring (Section 18), prioritized processing under timeout (Section 18), timeout alignment across layers (Section 18), over-mocking tests detection (Section 17), dual-layer cost tracking at provider + agent levels (Section 18). 5 new entries in "What No Tool Solves" (items 11-15, Appendix B). 9 new rule classifications in Appendix D.
 **Validation**: See `docs/PLAYBOOK-VALIDATION-REPORT.md` for full section-by-section validation with sources
