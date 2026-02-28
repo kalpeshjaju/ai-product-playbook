@@ -11,7 +11,8 @@ export default function HomePage() {
   return (
     <main style={{ maxWidth: 800, margin: '0 auto', padding: '40px 20px' }}>
       <h1>AI Product Playbook</h1>
-      <p>LLM-maintained patterns for production AI products.</p>
+      <p style={{ color: '#6b7280' }}>LLM-maintained patterns for production AI products.</p>
+      <p style={{ fontSize: 12, color: '#9ca3af' }}>Auto-deployed via GitHub Actions</p>
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {ENTRIES.map((e) => (
           <li key={e.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
