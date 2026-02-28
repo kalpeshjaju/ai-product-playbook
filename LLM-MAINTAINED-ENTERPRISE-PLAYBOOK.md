@@ -216,10 +216,14 @@ project/
 │   ├── e2e/
 │   └── llm-evals/           — Golden test cases for LLM behavior
 ├── scripts/                 — Deployment, migration, enforcement scripts
-├── CLAUDE.md                — LLM instructions (project-level)
+├── CLAUDE.md                — LLM instructions (single source of truth)
+├── .cursorrules             — Points to CLAUDE.md (Cursor reads this)
+├── AGENTS.md                — Points to CLAUDE.md (Codex/OpenAI reads this)
 ├── CODEOWNERS               — Decision authority enforcement
 └── package.json
 ```
+
+**Multi-LLM instruction file pattern**: CLAUDE.md is the single source of truth for all LLM coding rules, conventions, and project context. Every other tool-specific file (`.cursorrules`, `AGENTS.md`, `copilot-instructions.md`) contains only a one-line pointer: `Read CLAUDE.md for all project rules.` This prevents rule drift across tools — one file to maintain, all LLMs read the same rules.
 
 **Pragmatic note from feedback**: If your existing codebase uses a different structure (layer-based, monorepo, etc.) and it works — keep it. Strong docs compensate for non-ideal structure. Don't restructure a working codebase for theoretical purity.
 
@@ -3702,7 +3706,7 @@ Performance CI             Lighthouse CI                SpeedCurve              
 
 **Notes**:
 - Do NOT adopt Humanloop for LLM eval/prompt management — platform sunset September 2025.
-- AGENTS.md (Linux Foundation, 60K+ repos) is emerging as the universal instruction file standard alongside CLAUDE.md.
+- AGENTS.md (Linux Foundation, 60K+ repos) is emerging as the universal instruction file standard alongside CLAUDE.md. **Recommended pattern**: Use CLAUDE.md as the single source of truth; `.cursorrules` and `AGENTS.md` contain only a pointer (`Read CLAUDE.md for all project rules`). One file to maintain, zero drift.
 - Stripe's Minions architecture (1,000+ PRs/week per blog; 1,300+ per later X post) is the reference implementation for this playbook's approach.
 
 ---
