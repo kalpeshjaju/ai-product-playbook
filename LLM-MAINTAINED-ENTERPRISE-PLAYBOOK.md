@@ -6,7 +6,7 @@
 
 ### The Four Pillars of an AI Product
 
-Every AI product has four distinct pillars. This playbook covers all four:
+Every AI product has five distinct pillars. This playbook covers all five:
 
 ```
                     ┌─────────────────────────────────────────────────────────┐
@@ -35,11 +35,29 @@ Every AI product has four distinct pillars. This playbook covers all four:
 └─────────────────┘  └─────────────────┘  └─────────────────┘
          │                     │                      │
          └─────────── INFRA SERVES ALL THREE ─────────┘
+                               │
+                               ▼
+              ┌─────────────────────────────────┐
+              │          STRATEGY                │
+              │      (competitive moat)          │
+              ├─────────────────────────────────┤
+              │ Intelligence stack layers        │
+              │ Data flywheel design             │
+              │ Per-user personalization          │
+              │ Outcome-labeled data              │
+              │ Moat building & defense           │
+              ├─────────────────────────────────┤
+              │ Sections: 20, 21, 22             │
+              │ Feedback loops connect            │
+              │ all pillars into a flywheel       │
+              └─────────────────────────────────┘
 ```
 
-**Why four pillars, not three**: In traditional software, input is trivial — users fill forms, data goes into a database. In AI products, **Input splits out as its own pillar** because ingestion is multi-modal (voice, documents, images, APIs), lossy (every conversion loses information), and living (stale data produces actively wrong output with no error). You can build a perfect feature with a perfect model, but if your ingestion pipeline silently corrupts a PDF table or transcribes "higher" as "hire," the output is confidently wrong. Input quality is the ceiling on output quality.
+**Why five pillars, not three**: In traditional software, input is trivial — users fill forms, data goes into a database. In AI products, **Input splits out as its own pillar** because ingestion is multi-modal (voice, documents, images, APIs), lossy (every conversion loses information), and living (stale data produces actively wrong output with no error). You can build a perfect feature with a perfect model, but if your ingestion pipeline silently corrupts a PDF table or transcribes "higher" as "hire," the output is confidently wrong. Input quality is the ceiling on output quality.
 
 **Why Output is still separate from Product**: Output is probabilistic — you can build a perfect feature but the AI output can still be wrong, unsafe, or inconsistent. You need evals, guardrails, and output monitoring as a separate concern from feature development.
+
+**Why Strategy is its own pillar**: The first four pillars tell you how to build. Strategy tells you how to **defend**. Without it, you have a well-built product that any competitor with the same model and team can replicate in months. Strategy — specifically the data flywheel (Sections 20-22) — is what makes your product get better over time and harder to compete with. It connects all other pillars: Input quality feeds AI output quality, Output quality generates user signals, User signals improve Product decisions, and the cycle compounds. Sections 20-22 cover the intelligence stack (how to layer value around rented models), data architecture (what to capture and how to store it), and moat design (how to make accumulated data into a competitive advantage).
 
 ---
 
@@ -4536,6 +4554,1063 @@ All data is structured JSON                 Schema validation only. Skip parsing
 
 ---
 
+## 20. AI Product Intelligence Stack
+
+### The Core Insight: Nobody Trains a Model
+
+The most common misconception in AI product development: teams believe they need to "train their own model" or "fine-tune a foundation model" to build a defensible product. In practice, the most successful AI products in 2026 — Cursor, Wispr Flow, Granola, Lovable — don't train models. They build intelligent layers **around** rented models.
+
+```
+THE AI PRODUCT INTELLIGENCE STACK:
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│  LAYER 4: PERSONALIZATION                                                │
+│  Per-user learned preferences that compound over time                    │
+│                                                                          │
+│  "Kalpesh always dismisses remote-only jobs → filter before LLM"        │
+│  "This user prefers concise explanations → adjust system prompt"         │
+│  "User corrected 'gonna' → 'going to' 50 times → apply automatically"  │
+│                                                                          │
+│  WHEN TO ADD: Month 3+ (need enough user data to learn from)             │
+│  COMPETITIVE VALUE: High (switching cost — the longer they use it,       │
+│                     the harder to leave)                                  │
+├──────────────────────────────────────────────────────────────────────────┤
+│  LAYER 3: EVALUATION & ROUTING                                           │
+│  Which model? Which prompt version? What fallback?                       │
+│                                                                          │
+│  Task-based:    classify → Haiku, reason → Opus                         │
+│  User-based:    free tier → Haiku, paid → Sonnet, enterprise → Opus     │
+│  Quality-based: high-stakes → Opus + validation, low-stakes → Haiku     │
+│  Cost-based:    budget remaining < 20% → downgrade all to Haiku         │
+│                                                                          │
+│  WHEN TO ADD: Month 2+ (need cost data to optimize)                      │
+│  COMPETITIVE VALUE: Medium (operational efficiency, not defensible)       │
+├──────────────────────────────────────────────────────────────────────────┤
+│  LAYER 2: PROMPT ENGINEERING + RAG                                       │
+│  System prompts, few-shot examples, retrieved context, guardrails        │
+│                                                                          │
+│  System prompt: domain expertise, output format, safety rules            │
+│  Few-shot bank: curated good/bad examples from real user interactions    │
+│  RAG context:   user's resume + job details + company info stuffed in    │
+│  Guardrails:    output validation, hallucination checks, PII filtering   │
+│                                                                          │
+│  WHEN TO ADD: Day 1 (this is your MVP)                                   │
+│  COMPETITIVE VALUE: Low alone (anyone can write prompts),                │
+│                     High when combined with Layers 3+4 data               │
+├──────────────────────────────────────────────────────────────────────────┤
+│  LAYER 1: BASE LLM (rented)                                             │
+│  Claude / GPT / Whisper / Deepgram / Gemini                             │
+│  You don't own this. You call it. It's a commodity.                      │
+│                                                                          │
+│  WHEN: Always (you never build this)                                     │
+│  COMPETITIVE VALUE: Zero (everyone has access to the same models)        │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why this order matters**: Each layer compounds on the one below it. Layer 2 makes Layer 1 useful. Layer 3 makes Layer 2 cost-effective. Layer 4 makes the whole stack defensible. Skipping layers or building them out of order wastes effort — you can't personalize if you don't have good prompts, and you can't route intelligently if you don't have eval data.
+
+### Layer Investment Sequencing
+
+Not every layer is worth building at every stage. Premature investment in Layer 4 (personalization) before you have Layer 2 (good prompts) working is waste.
+
+```
+PRODUCT STAGE          LAYER FOCUS                     EVIDENCE YOU'RE READY FOR NEXT
+
+MVP (Month 1-2)        Layer 1 + Layer 2               Users are getting value from AI output
+                       Base model + good prompts        Retention > 20% at week 2
+                       + basic RAG                      Users complete core action > 50%
+
+Growth (Month 3-6)     + Layer 3                        You're spending > $500/mo on LLM calls
+                       Add model routing                Different tasks have measurably different
+                       + eval pipeline                  complexity levels
+                       + prompt versioning              You have > 1000 logged interactions
+
+Scale (Month 6-12)     + Layer 4                        You have per-user behavioral data
+                       Add personalization              Users with 50+ interactions retain 2x
+                       + preference learning            Preference patterns are detectable
+                       + per-user context injection     You can A/B test personalized vs generic
+
+Moat (Month 12+)       All layers + feedback loops      Your few-shot bank has 10K+ curated examples
+                       Data flywheel is spinning         Per-user models improve measurably
+                       Outcome data feeds back           New competitors can't replicate 12mo of data
+```
+
+### Decision Framework: RAG vs Fine-Tuning vs Prompt Engineering
+
+The three techniques are not alternatives — they solve different problems. Using the wrong one wastes money and time.
+
+```
+WHEN                                    CHOOSE              BECAUSE                            COST
+
+Need external knowledge                 RAG                 Model doesn't know your data.      Low ($)
+(your docs, user data, real-time)                           Stuff it into context at runtime.
+
+Need to follow custom format            Prompt Engineering   Cheaper and faster to iterate.     Lowest ($)
+(JSON schema, specific tone)                                Change in minutes, not hours.
+
+Need behavioral change at scale         Fine-Tuning          When prompt eng hits ceiling.      High ($$$)
+(10K+ examples of desired behavior)                         Model internalizes the pattern.
+
+Need cost reduction                     Routing + Cache      Use cheap models for simple tasks.  Medium ($$)
+(most calls don't need Opus)                                Cache near-duplicate queries.
+
+Need to match individual user style     Personalization      Inject per-user context.           Medium ($$)
+(Wispr Flow's per-user dictionary)      (Layer 4)           Not fine-tuning — context stuffing.
+
+Need to reduce hallucination            Prompt Eng + Evals   Try prompt constraints first.      Low ($)
+(model invents facts)                                       Add eval pipeline to catch failures.
+
+Need domain expertise                   RAG + Few-Shot       Retrieve domain docs + show         Low-Med
+(legal, medical, financial)                                 the model expert examples.           ($-$$)
+```
+
+**The critical insight**: Fine-tuning is a **last resort**, not a first step. In 2026, prompt engineering + RAG + routing handles 95% of use cases. Fine-tuning is only justified when you have 10,000+ curated input/output pairs AND prompt engineering demonstrably can't achieve the quality you need.
+
+**Enforcement [DOCS ONLY]**: Before any fine-tuning project, document in `docs/DECISIONS.md`: (1) what prompt engineering approaches were tried, (2) measured quality gap, (3) estimated fine-tuning cost, (4) expected quality improvement. CODEOWNERS requires non-coder approval for fine-tuning budget.
+
+### How Companies Actually Use Their Data
+
+These are not speculative — they reflect publicly available information and validated industry patterns as of February 2026.
+
+```
+┌────────────┬──────────────────────────────────────┬────────────────────────────────────────────────────────┐
+│  Company   │         What they capture            │         How they use it (NOT fine-tuning)              │
+├────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ Cursor     │ Every accepted/rejected code          │ Prompt tuning: rejected completions teach what NOT    │
+│            │ completion across 500K+ devs          │ to suggest. Context window optimization: learn which  │
+│            │                                       │ files matter for each completion. Model routing:      │
+│            │                                       │ simple completions → fast model, complex → Opus.      │
+├────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ Wispr Flow │ Every text correction the user        │ Per-user correction dictionary injected into prompt.  │
+│            │ makes after dictation                 │ Style profile: "formal" vs "casual" per user.         │
+│            │                                       │ Custom vocabulary: domain-specific terms.              │
+│            │                                       │ After 6 months, switching cost is enormous.            │
+├────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ Granola    │ User edits to AI-generated            │ Better few-shot examples for system prompts.          │
+│            │ meeting summaries                     │ Improved summarization templates from real edits.     │
+│            │                                       │ Pattern: what users add back = what the AI missed.    │
+├────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ Lovable    │ Which generated code users            │ Prompt optimization: components users keep become     │
+│            │ keep vs delete vs edit                │ few-shot examples. Model routing: complex layouts →   │
+│            │                                       │ Opus, simple components → Haiku. Template library     │
+│            │                                       │ built from highest-retention generated code.           │
+├────────────┼──────────────────────────────────────┼────────────────────────────────────────────────────────┤
+│ Anthropic  │ RLHF feedback, thumbs up/down,       │ Actually DOES fine-tune — but Anthropic IS the model  │
+│            │ conversation quality signals           │ company. This is the exception, not the rule.         │
+│            │                                       │ For product companies, this path requires $10M+       │
+│            │                                       │ compute budget and dedicated ML team.                  │
+└────────────┴──────────────────────────────────────┴────────────────────────────────────────────────────────┘
+```
+
+**The pattern**: Every successful AI product captures user corrections/feedback, stores them in their own database, and injects them as context into future LLM calls. None of them (except Anthropic) fine-tune models. The data goes **around** the model, not **into** it.
+
+### Context Injection Patterns
+
+The practical implementation of Layers 2-4 — how to stuff the right context into each LLM call.
+
+```typescript
+/**
+ * Context injection for an AI product (e.g., job matching)
+ *
+ * WHY: The base model knows nothing about YOUR user or YOUR domain.
+ *      Context injection is how you make a generic model specific.
+ * HOW: Build context from multiple sources, inject into system prompt.
+ *
+ * LAYERS USED:
+ *   Layer 2: domain expertise (system prompt + few-shot examples)
+ *   Layer 3: model routing (task complexity → model selection)
+ *   Layer 4: personalization (per-user preferences from learned behavior)
+ */
+
+interface ContextSources {
+  domain: string;         // Layer 2: system prompt with domain expertise
+  fewShot: Example[];     // Layer 2: curated good/bad examples
+  ragContext: string;      // Layer 2: retrieved documents
+  userPreferences: UserPreferences; // Layer 4: learned from behavior
+  taskType: TaskType;      // Layer 3: determines model routing
+}
+
+async function buildContextForLLMCall(
+  userId: string,
+  userQuery: string,
+  taskType: TaskType
+): Promise<ContextSources> {
+  // Layer 2: Domain expertise (static, changes with prompt versions)
+  const domain = await getPromptVersion('job-matching', 'v2.3');
+
+  // Layer 2: Few-shot examples (curated from high-quality past interactions)
+  const fewShot = await getFewShotExamples({
+    taskType,
+    limit: 5,
+    filter: { quality_score: { gte: 0.8 } }, // Only examples users rated highly
+  });
+
+  // Layer 2: RAG context (retrieved per-request)
+  const ragContext = await retrieveContext(userQuery, {
+    sources: ['user_resume', 'job_listings', 'company_profiles'],
+    maxTokens: 4000,
+  });
+
+  // Layer 4: Per-user preferences (learned from past behavior)
+  const userPreferences = await getUserPreferences(userId);
+  // Returns: { remote_weight: 0.9, salary_weight: 0.8, title_weight: 0.3,
+  //            preferred_format: 'concise', derived_from_n_actions: 147 }
+
+  return { domain, fewShot, ragContext, userPreferences, taskType };
+}
+
+// Layer 3: Model routing based on task complexity and user tier
+function selectModel(taskType: TaskType, userTier: UserTier): ModelId {
+  const routing: Record<TaskType, Record<UserTier, ModelId>> = {
+    'quick_match_preview': { free: 'haiku', paid: 'haiku', enterprise: 'sonnet' },
+    'detailed_analysis':   { free: 'sonnet', paid: 'sonnet', enterprise: 'opus' },
+    'career_advice':       { free: 'sonnet', paid: 'opus', enterprise: 'opus' },
+  };
+  return routing[taskType]?.[userTier] ?? 'sonnet'; // Safe default
+}
+```
+
+**Enforcement [HARD GATE]**: Every LLM call in the application must go through `buildContextForLLMCall()`. Direct model calls without context injection are banned:
+
+```bash
+# scripts/check-context-injection.sh
+# Verify all LLM calls use the context builder
+for f in $(grep -rl 'streamText\|generateText\|llm.chat' src/ --include='*.ts'); do
+  if ! grep -q 'buildContextForLLMCall\|ContextSources' "$f"; then
+    echo "❌ $f calls LLM without context injection"
+    exit 1
+  fi
+done
+echo "✅ All LLM calls use context injection"
+```
+
+### Prompt Versioning
+
+Prompts are code. They need versioning, A/B testing, and rollback — just like any other deployment artifact.
+
+```
+PROMPT VERSIONING STRATEGY:
+
+STORAGE:         Database table (not hardcoded strings)
+VERSIONING:      Semantic versioning (v1.0.0 → v1.1.0 for minor, v2.0.0 for breaking)
+A/B TESTING:     PostHog feature flags route users to prompt versions
+ROLLBACK:        Previous version always available, instant rollback via flag
+AUDIT TRAIL:     Every version change logged with author, reason, eval scores
+
+PROMPT VERSION TABLE:
+┌──────────────────┬────────┬─────────────┬──────────────┬───────────────┬──────────┐
+│ prompt_name      │ version│ content_hash│ eval_score   │ active_pct    │ author   │
+├──────────────────┼────────┼─────────────┼──────────────┼───────────────┼──────────┤
+│ job-matching     │ v2.3   │ abc123      │ 0.87         │ 90%           │ claude   │
+│ job-matching     │ v2.4   │ def456      │ 0.91 (test)  │ 10%           │ claude   │
+│ career-advice    │ v1.2   │ ghi789      │ 0.82         │ 100%          │ kalpesh  │
+└──────────────────┴────────┴─────────────┴──────────────┴───────────────┴──────────┘
+
+PROMOTION FLOW:
+  New version → 10% traffic (A/B via PostHog) → measure eval scores for 7 days
+  → if score improves ≥ 5% → promote to 50% → 100%
+  → if score drops → auto-rollback to previous version
+```
+
+**Enforcement [SOFT CHECK]**: CI warns if prompt strings are hardcoded in application code instead of loaded from the prompt version table. Prompts in code are acceptable only in tests and development scripts.
+
+### When NOT to Build This Stack
+
+```
+IF YOUR PRODUCT...                          THEN INSTEAD...
+──────────────────────────────────────────  ────────────────────────────────────
+Has < 100 users                             Layer 1 + Layer 2 only. Skip routing and personalization.
+Is a one-shot tool (no repeat users)        Skip Layer 4 entirely. No data to personalize from.
+Has no user-facing AI output                Skip this section. Standard software patterns apply.
+Uses AI only for internal tooling           Layer 1 + Layer 2. Cost matters more than personalization.
+Is a wrapper around a single API call       Skip Layers 3-4. Not enough complexity to justify.
+```
+
+---
+
+## 21. Data Architecture for AI Moats
+
+### The Three Data Planes
+
+Every AI product generates three distinct categories of data. Most products instrument Plane 1 (system health) well, Plane 2 (user behavior) adequately, and Plane 3 (AI quality) barely or not at all. Plane 3 is where the moat lives.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PLANE 1: SYSTEM HEALTH                                                 │
+│  "Is the product working?"                                              │
+│                                                                         │
+│  • Build/deploy status, uptime, error rates                            │
+│  • API latency (p50, p95, p99)                                         │
+│  • LLM API costs, token usage, model versions                          │
+│  • Infrastructure spend, resource utilization                           │
+│  • Cache hit rates, queue depth                                         │
+│                                                                         │
+│  Owner: Engineering                                                     │
+│  Store: Sentry (errors) + Datadog (APM) + LiteLLM (LLM metrics)       │
+│  Refresh: Real-time                                                     │
+│  Moat value: ZERO (everyone has monitoring)                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PLANE 2: USER BEHAVIOR                                                 │
+│  "How are people using it?"                                             │
+│                                                                         │
+│  • Feature usage, session duration, retention curves                   │
+│  • Conversion funnels, drop-off points                                  │
+│  • Session replays (what users actually do vs what you think they do)   │
+│  • Search queries, filter selections, navigation patterns               │
+│  • Churn signals, re-engagement triggers                                │
+│                                                                         │
+│  Owner: Product                                                         │
+│  Store: PostHog (analytics + session replay + feature flags)           │
+│  Refresh: Near real-time (< 1 minute)                                  │
+│  Moat value: LOW (Amplitude/Mixpanel give competitors the same)         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PLANE 3: AI QUALITY                                                    │
+│  "Is the AI output actually good? Did it work?"                         │
+│                                                                         │
+│  • Prompt + response pairs (logged with full context)                  │
+│  • User accepted / rejected / edited the AI output                      │
+│  • Thumbs up/down, regenerate clicks, copy actions                     │
+│  • Hallucination rate (automated detection + user reports)              │
+│  • Latency per generation, cost per generation                         │
+│  • Eval scores (automated rubric + human judgment)                      │
+│  • Eventual outcomes (did the match lead to an interview? a hire?)      │
+│                                                                         │
+│  Owner: AI/ML team (or founder in early stage)                          │
+│  Store: YOUR DATABASE (PostgreSQL) + Langfuse (traces)                 │
+│  Refresh: Per-interaction (log every AI call)                           │
+│  Moat value: HIGH (this is YOUR data, nobody else has it)               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why Plane 3 is the moat**: Planes 1 and 2 use off-the-shelf tools that any competitor can set up in a day. Plane 3 is **your proprietary data** — the accumulation of every AI interaction, every user correction, every outcome signal. It takes months to years to accumulate meaningful Plane 3 data. A competitor launching today starts with zero, regardless of their model or funding.
+
+### The Cardinal Rule: Same User ID Everywhere
+
+Data unification doesn't mean copying data between tools. It means every tool uses the same user identifier, so you can correlate across planes when needed.
+
+```typescript
+/**
+ * Identity unification across all data planes
+ *
+ * WHY: When a Sentry error spikes (Plane 1), you need to know which users
+ *      were affected (Plane 2) and whether AI quality degraded (Plane 3).
+ *      Same userId everywhere makes this a single query, not a data science project.
+ */
+
+// Plane 1: Error tracking
+Sentry.setUser({ id: userId, email: user.email });
+
+// Plane 2: Product analytics
+posthog.identify(userId, {
+  email: user.email,
+  plan: user.plan,
+  signup_date: user.createdAt,
+});
+
+// Plane 3: AI quality (your database)
+await db.aiGenerations.create({
+  userId,
+  // ... rest of the generation record
+});
+
+// Plane 1: LLM observability
+langfuse.trace({
+  userId,
+  // ... rest of the trace
+});
+```
+
+**Enforcement [HARD GATE]**: Every service initialization that accepts a user context must include `userId`. CI lints for Sentry/PostHog/Langfuse calls without user identification:
+
+```bash
+# scripts/check-user-identity.sh
+for f in $(grep -rl 'Sentry.setUser\|posthog.identify\|langfuse.trace' src/ --include='*.ts'); do
+  if ! grep -q 'userId\|user_id\|user\.id' "$f"; then
+    echo "❌ $f initializes tracking without userId"
+    exit 1
+  fi
+done
+```
+
+### Plane 3 Schema: The AI Quality Database
+
+This is the most important schema in your product. It captures every AI interaction with enough context to improve the system.
+
+```sql
+-- Core table: every AI generation event
+-- This table is the foundation of your moat
+CREATE TABLE ai_generations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- WHO
+  user_id         UUID NOT NULL REFERENCES users(id),
+  session_id      UUID,                          -- group related generations
+
+  -- WHAT WAS ASKED
+  prompt_hash     TEXT NOT NULL,                 -- hash of input (for dedup/analysis)
+  prompt_version  TEXT NOT NULL,                 -- which prompt template version
+  task_type       TEXT NOT NULL,                 -- 'match', 'analyze', 'advise', etc.
+  input_tokens    INTEGER NOT NULL,
+
+  -- WHAT WAS RETURNED
+  response_hash   TEXT NOT NULL,                 -- hash of output
+  output_tokens   INTEGER NOT NULL,
+  model           TEXT NOT NULL,                 -- 'claude-opus-4-6', 'claude-haiku-4-5', etc.
+  model_version   TEXT NOT NULL,                 -- exact model version for reproducibility
+  latency_ms      INTEGER NOT NULL,
+  cost_usd        NUMERIC(10,6) NOT NULL,        -- cost of this specific call
+
+  -- WAS IT GOOD? (filled asynchronously as user interacts)
+  user_feedback   TEXT,                          -- 'accepted', 'rejected', 'edited', 'regenerated'
+  feedback_at     TIMESTAMPTZ,
+  thumbs          SMALLINT CHECK (thumbs IN (-1, 0, 1)),  -- -1 = down, 0 = none, 1 = up
+  user_edit_diff  TEXT,                          -- what the user changed (if edited)
+
+  -- AUTOMATED QUALITY
+  quality_score   NUMERIC(3,2),                  -- 0.00-1.00 from eval pipeline
+  hallucination   BOOLEAN DEFAULT false,         -- detected by automated check or user report
+  guardrail_triggered TEXT[],                    -- which guardrails fired, if any
+
+  -- INDEXES for common queries
+  -- "How is quality trending?" → created_at + quality_score
+  -- "Which prompt version performs best?" → prompt_version + quality_score
+  -- "User's interaction history" → user_id + created_at
+  -- "Hallucination rate by model" → model + hallucination
+  CONSTRAINT valid_feedback CHECK (user_feedback IN
+    ('accepted', 'rejected', 'edited', 'regenerated', 'ignored'))
+);
+
+CREATE INDEX idx_ai_gen_user ON ai_generations(user_id, created_at DESC);
+CREATE INDEX idx_ai_gen_quality ON ai_generations(created_at, quality_score);
+CREATE INDEX idx_ai_gen_prompt ON ai_generations(prompt_version, quality_score);
+CREATE INDEX idx_ai_gen_model ON ai_generations(model, hallucination);
+
+-- Per-user learned preferences (Layer 4 of the Intelligence Stack)
+-- These are DERIVED from user behavior, not self-reported
+CREATE TABLE user_preferences (
+  user_id             UUID PRIMARY KEY REFERENCES users(id),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- Learned weights (normalized 0.0-1.0)
+  -- These are computed from user actions, not user settings
+  learned_weights     JSONB NOT NULL DEFAULT '{}',
+  -- Example: {"remote": 0.9, "salary": 0.8, "title": 0.3, "company_size": 0.6}
+
+  -- Confidence: how many actions informed these weights
+  derived_from_n      INTEGER NOT NULL DEFAULT 0,
+
+  -- Behavioral patterns
+  preferred_format    TEXT DEFAULT 'standard',    -- 'concise', 'detailed', 'standard'
+  response_language   TEXT DEFAULT 'en',
+  active_hours        JSONB,                      -- when they typically use the product
+
+  -- Correction history (for Wispr Flow-style learning)
+  correction_pairs    JSONB DEFAULT '[]'          -- [{"from": "gonna", "to": "going to"}]
+);
+
+-- Aggregate quality signals (for global learning, not per-user)
+-- "What works for what kind of user/task?"
+CREATE TABLE match_quality_signals (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  computed_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  period_start        TIMESTAMPTZ NOT NULL,
+  period_end          TIMESTAMPTZ NOT NULL,
+
+  -- Segment dimensions
+  task_type           TEXT NOT NULL,
+  user_segment        TEXT NOT NULL,               -- 'new', 'active', 'power'
+  prompt_version      TEXT NOT NULL,
+  model               TEXT NOT NULL,
+
+  -- Aggregate metrics
+  total_generations   INTEGER NOT NULL,
+  accept_rate         NUMERIC(5,4),                -- 0.0000-1.0000
+  avg_quality_score   NUMERIC(5,4),
+  hallucination_rate  NUMERIC(5,4),
+  avg_latency_ms      INTEGER,
+  avg_cost_usd        NUMERIC(10,6),
+  user_satisfaction    NUMERIC(5,4),               -- from thumbs up/down
+
+  UNIQUE(period_start, task_type, user_segment, prompt_version, model)
+);
+
+-- Outcome tracking: the delayed signal that closes the loop
+-- This is the data nobody else has — ground truth
+CREATE TABLE outcomes (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  user_id             UUID NOT NULL REFERENCES users(id),
+
+  -- What AI output led to this outcome
+  generation_id       UUID REFERENCES ai_generations(id),
+  -- For job matching: which match led to what
+  entity_id           TEXT,                        -- job_id, recommendation_id, etc.
+
+  -- Outcome signals (filled over time via follow-up or webhook)
+  outcome_type        TEXT NOT NULL,               -- 'applied', 'interview', 'offer', 'hired', 'rejected'
+  outcome_at          TIMESTAMPTZ,
+  outcome_metadata    JSONB,                       -- { "salary_offered": 150000, "response_time_days": 3 }
+
+  -- Quality of the AI prediction
+  ai_score            NUMERIC(3,2),                -- what the AI predicted (match score)
+  actual_fit          NUMERIC(3,2),                -- actual fit based on outcome (computed)
+  prediction_error    NUMERIC(3,2) GENERATED ALWAYS AS (ai_score - actual_fit) STORED
+);
+
+CREATE INDEX idx_outcomes_user ON outcomes(user_id, created_at DESC);
+CREATE INDEX idx_outcomes_gen ON outcomes(generation_id);
+```
+
+**Enforcement [HARD GATE]**: Every LLM call must write to `ai_generations`. CI blocks PRs that add new LLM call sites without corresponding `ai_generations` inserts:
+
+```bash
+# scripts/check-ai-logging.sh
+for f in $(grep -rl 'streamText\|generateText\|llm.chat' src/ --include='*.ts'); do
+  if ! grep -q 'aiGenerations\|ai_generations\|logGeneration' "$f"; then
+    echo "❌ $f makes LLM call without logging to ai_generations"
+    exit 1
+  fi
+done
+```
+
+### Feedback Loop Architecture
+
+The entire point of Plane 3 data is to feed it back into the system. Without a feedback loop, you're just collecting data. With it, you're building a flywheel.
+
+```
+THE FEEDBACK LOOP:
+
+User interacts with AI output
+       │
+       ▼
+┌─────────────────────────┐
+│  CAPTURE                 │
+│  Log to ai_generations   │
+│  - prompt, response      │
+│  - model, cost, latency  │
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐     ┌─────────────────────────────────────────┐
+│  OBSERVE                 │     │  User provides signal:                  │
+│  User acts on the output │────▶│  • Accepted (applied to job)            │
+│                          │     │  • Rejected (dismissed match)           │
+│                          │     │  • Edited (changed AI explanation)      │
+│                          │     │  • Regenerated (asked for another try)  │
+│                          │     │  • Thumbs up/down                       │
+└──────────────────────────┘     └──────────┬──────────────────────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │  ANALYZE (async)         │
+                               │  Weekly batch job:       │
+                               │  • Compute quality scores│
+                               │  • Update user prefs     │
+                               │  • Refresh few-shot bank │
+                               │  • Update segment models │
+                               └──────────┬──────────────┘
+                                          │
+                                          ▼
+                               ┌─────────────────────────┐
+                               │  IMPROVE                  │
+                               │  • Promote high-quality   │
+                               │    examples to few-shot   │
+                               │  • Adjust prompt weights  │
+                               │  • Update user prefs      │
+                               │  • Route differently      │
+                               └──────────┬──────────────┘
+                                          │
+                                          ▼
+                               ┌─────────────────────────┐
+                               │  MEASURE                  │
+                               │  Did quality_score go up? │
+                               │  Did accept_rate go up?   │
+                               │  Did cost go down?        │
+                               │  → If yes, keep change    │
+                               │  → If no, rollback        │
+                               └──────────────────────────┘
+```
+
+### Few-Shot Bank: Curating Real Interactions Into Training Data
+
+The few-shot bank is a curated set of high-quality real interactions that get injected into prompts. It's not a database dump — it's a carefully maintained collection of examples that demonstrate what "good" looks like.
+
+```typescript
+/**
+ * Few-shot bank management
+ *
+ * WHY: Generic prompts produce generic output. Real examples from YOUR users
+ *      produce output that matches YOUR domain and quality bar.
+ *
+ * HOW: High-quality interactions (accepted + thumbs_up + quality_score > 0.8)
+ *      are promoted to the few-shot bank. Low-quality interactions are
+ *      demoted. The bank is capped at 1000 examples per task type.
+ *
+ * FREQUENCY: Weekly batch job reviews new interactions and updates the bank.
+ */
+
+async function refreshFewShotBank(taskType: string): Promise<void> {
+  // Find high-quality recent interactions
+  const candidates = await db.aiGenerations.findMany({
+    where: {
+      task_type: taskType,
+      quality_score: { gte: 0.8 },
+      user_feedback: 'accepted',
+      thumbs: 1,
+      created_at: { gte: subDays(new Date(), 30) }, // Last 30 days
+    },
+    orderBy: { quality_score: 'desc' },
+    take: 100,
+  });
+
+  // Deduplicate by prompt similarity (avoid near-duplicate examples)
+  const deduplicated = deduplicateBySimilarity(candidates, {
+    similarityThreshold: 0.85,
+  });
+
+  // Update the few-shot bank
+  await db.fewShotBank.upsert({
+    taskType,
+    examples: deduplicated.slice(0, 50), // Top 50 per task type
+    refreshedAt: new Date(),
+  });
+}
+```
+
+### Instrumentation Checklist
+
+What to capture at every interaction point. Missing any of these creates blind spots in your feedback loop.
+
+```
+INTERACTION POINT           WHAT TO CAPTURE                              WHERE IT GOES        PRIORITY
+
+AI response generated       prompt_hash, response_hash, model,           ai_generations       P0 (day 1)
+                            tokens, cost, latency, prompt_version
+
+User views AI output        view_timestamp, time_on_page                 PostHog event        P0 (day 1)
+
+User accepts output         feedback='accepted', action taken            ai_generations       P0 (day 1)
+(clicks apply, saves, etc)
+
+User rejects output         feedback='rejected', time_to_reject          ai_generations       P0 (day 1)
+(dismisses, skips)
+
+User edits output           feedback='edited', diff of changes           ai_generations       P1 (week 2)
+(modifies AI suggestion)
+
+User regenerates            feedback='regenerated', attempt_number       ai_generations       P1 (week 2)
+
+User gives explicit         thumbs=1/-1                                  ai_generations       P1 (week 2)
+feedback (thumbs)
+
+Outcome achieved            outcome_type, outcome_at, metadata           outcomes             P1 (month 2)
+(interview, hired, etc)
+
+User preference signal      learned_weights updated                      user_preferences     P2 (month 3)
+(pattern of accepts/rejects)
+
+Hallucination detected      hallucination=true, detection_method         ai_generations       P0 (day 1)
+(automated or user-reported)
+```
+
+**Enforcement [HARD GATE]**: P0 instrumentation must be present before any feature ships to production. CI checks that all AI-facing routes include the P0 capture points.
+
+### Privacy & Ethics Considerations
+
+AI quality data is sensitive. It contains user interactions, preferences, and behavioral patterns.
+
+```
+PRINCIPLE                     IMPLEMENTATION                                    ENFORCEMENT
+
+User owns their data          Export endpoint: GET /api/me/ai-data             [HARD GATE] — required for GDPR
+Right to deletion             DELETE /api/me/ai-data cascades to all tables    [HARD GATE] — required for GDPR
+Anonymize for analytics       Strip PII before aggregate analysis              [HARD GATE] — CI check
+No training without consent   Feature flag: 'allow_data_for_improvement'       [HARD GATE] — opt-in only
+Retention limits              ai_generations older than 24 months → archive    [SOFT CHECK] — cron job
+Transparency                  Show users: "We learned X preferences from       [DOCS ONLY]
+                              your Y interactions"
+```
+
+### Data Flow: Where Each Tool Fits
+
+Don't copy data between tools. Query each where it lives. The only data that flows between tools is webhooks for business events.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        YOUR DATABASE (PostgreSQL)                            │
+│                     Source of truth for:                                     │
+│                     • WHO the user is (identity, plan, preferences)         │
+│                     • AI QUALITY data (ai_generations, outcomes)             │
+│                     • Business state (subscriptions, credits)               │
+│                                                                             │
+│                     Receives webhooks from:                                  │
+│                     • Stripe (payment events → update plan)                 │
+│                     • Sentry (error spikes → alert)                         │
+│                                                                             │
+│                     Queried by:                                              │
+│                     • Your app (runtime queries)                            │
+│                     • Weekly batch jobs (few-shot refresh, preference learn) │
+│                     • PostHog data warehouse connector (analytics)          │
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌───────────────┐   ┌──────────────────┐   ┌──────────────────┐
+│  PostHog       │   │  Sentry           │   │  Langfuse         │
+│  (Plane 2)     │   │  (Plane 1)        │   │  (Plane 1+3)      │
+│                │   │                    │   │                    │
+│  User behavior │   │  Errors, crashes   │   │  LLM traces,      │
+│  Funnels       │   │  Performance       │   │  prompt versions,  │
+│  Feature flags │   │  Stack traces      │   │  token costs       │
+│  Session replay│   │                    │   │                    │
+│                │   │  DON'T replicate   │   │  DON'T replicate   │
+│  Query via API │   │  Query via API     │   │  Query via API     │
+│  on demand     │   │  on demand         │   │  on demand         │
+└───────────────┘   └──────────────────┘   └──────────────────┘
+```
+
+**Anti-pattern**: Don't build ETL pipelines syncing PostHog events into your database or Sentry errors into a custom table. These tools handle their own storage, search, and retention. Query them via API when needed. The only data you replicate is Plane 3 (AI quality) because that's your proprietary moat.
+
+### When NOT to Build This Architecture
+
+```
+IF YOUR PRODUCT...                          THEN INSTEAD...
+──────────────────────────────────────────  ────────────────────────────────────
+Has < 50 daily active users                 Log ai_generations only. Skip preferences and outcomes.
+AI output is binary (yes/no, pass/fail)     Simpler schema: just log accuracy, skip feedback types.
+No repeat users (one-shot tool)             Skip user_preferences entirely. Focus on global quality.
+Uses AI only for internal automation        Langfuse traces are enough. Skip the full schema.
+Is pre-product-market-fit                   Log everything but don't build analysis pipeline yet.
+                                            Data accumulates while you find PMF.
+```
+
+---
+
+## 22. Competitive Moat & Flywheel Design
+
+### The Data Flywheel
+
+A flywheel is a self-reinforcing cycle: more users create more data, more data creates a better product, a better product attracts more users. In AI products, the flywheel is the primary competitive advantage — more important than the model, the team, or the funding.
+
+```
+THE AI PRODUCT FLYWHEEL:
+
+                    ┌──────────────┐
+          ┌────────▶│  More Users   │────────┐
+          │         └──────────────┘         │
+          │                                  │
+          │                                  ▼
+┌─────────┴────────┐              ┌─────────────────────┐
+│  Better Product   │              │  More Interactions   │
+│  (higher quality, │              │  (clicks, applies,   │
+│   personalized,   │              │   edits, feedback)   │
+│   lower latency)  │              └──────────┬──────────┘
+└─────────┬────────┘                          │
+          │                                   │
+          │                                   ▼
+          │         ┌──────────────────────────────────┐
+          │         │  More Plane 3 Data                │
+          │         │  (quality signals, outcomes,      │
+          │         │   preferences, few-shot examples) │
+          └─────────┴──────────────────────────────────┘
+
+SPEED OF THE FLYWHEEL depends on:
+1. How much signal each interaction generates (instrumentation depth)
+2. How fast you close the loop (batch weekly → real-time)
+3. How visible the improvement is to users (do they FEEL it getting better?)
+```
+
+### Three Moat Types
+
+Not all moats are equal. Choose your primary moat type based on your product and market.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│  MOAT TYPE 1: PERSONALIZATION DEPTH                                                │
+│  "The longer I use it, the harder to leave"                                        │
+│                                                                                    │
+│  How it works:   Each user interaction teaches the system about THAT user.         │
+│                  After 6 months, the system knows them better than any alternative.│
+│                                                                                    │
+│  Examples:                                                                         │
+│  • Wispr Flow:  6 months of corrections = perfect dictation for YOUR voice        │
+│  • Spotify:     10 years of listening = irreplaceable recommendations              │
+│  • Job-matcher: 50 applications = knows exactly what jobs you want                │
+│                                                                                    │
+│  Strengths:     Very high switching cost. Compound effect visible to user.         │
+│  Weaknesses:    Slow to build (needs months of per-user data). Each new user       │
+│                 starts from zero. Doesn't help with acquisition.                   │
+│                                                                                    │
+│  Design requirement: user_preferences table + per-user context injection           │
+│  Key metric:    Retention of users with 50+ interactions vs < 10 interactions      │
+└────────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│  MOAT TYPE 2: NETWORK DATA                                                         │
+│  "Every user makes it better for ALL users"                                        │
+│                                                                                    │
+│  How it works:   Aggregate signals across all users improve the system globally.  │
+│                  More users = better for everyone, not just the individual.        │
+│                                                                                    │
+│  Examples:                                                                         │
+│  • Waze:        Every driver improves traffic predictions for everyone            │
+│  • Granola:     Every meeting note improves summarization for all                 │
+│  • Job-matcher: Every apply/dismiss signal improves matching for everyone          │
+│                                                                                    │
+│  Strengths:     Scales with users. Every new user contributes immediately.         │
+│  Weaknesses:    Competitor with enough funding can bootstrap with synthetic data.  │
+│                 Hard to attribute improvement to network effect.                    │
+│                                                                                    │
+│  Design requirement: match_quality_signals table + few-shot bank refresh           │
+│  Key metric:    Quality score improvement rate as user count grows                │
+└────────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│  MOAT TYPE 3: PROPRIETARY EVALUATION                                               │
+│  "We know what 'good' means better than anyone"                                    │
+│                                                                                    │
+│  How it works:   Outcome-labeled data (did this match lead to a hire?)             │
+│                  creates ground truth that no competitor has access to.             │
+│                                                                                    │
+│  Examples:                                                                         │
+│  • Anthropic:   Millions of RLHF pairs = best alignment evaluation                │
+│  • Cursor:      Millions of accept/reject signals = best code quality eval         │
+│  • Job-matcher: Actual hire outcomes = ground truth for match quality              │
+│                                                                                    │
+│  Strengths:     Hardest to replicate. Requires real-world outcomes, not just data. │
+│  Weaknesses:    Slowest to build (outcomes are delayed — hire takes months).        │
+│                 Requires proactive follow-up ("Did you get the interview?").        │
+│                                                                                    │
+│  Design requirement: outcomes table + follow-up automation                          │
+│  Key metric:    Correlation between ai_score and actual_fit (prediction accuracy)  │
+└────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Recommendation**: Build all three, but **sequence them**. Personalization Depth is your first moat (fastest to show value). Network Data is your second (scales with growth). Proprietary Evaluation is your ultimate moat (hardest to replicate, but slowest to build).
+
+### Moat Sequencing Timeline
+
+```
+MONTH    MOAT ACTIVITY                              EVIDENCE IT'S WORKING
+
+1        Log all AI interactions (ai_generations)    You can query quality trends
+         Set up basic instrumentation (P0 items)     Hallucination rate is measurable
+         Track accept/reject/edit on all AI output   You have a feedback signal
+
+2        Start prompt A/B testing (PostHog flags)    You can measure prompt quality
+         Set up model routing by task type            Cost per interaction drops 30-50%
+         Begin curating few-shot bank                 AI output quality score improves
+
+3        Launch per-user preference learning          Power users report "it gets me"
+         Inject learned preferences into context      Retention at 50+ interactions > 2x
+         Make preferences visible to user             Users mention personalization
+         MOAT 1 (Personalization) starts compounding
+
+6        Implement outcome tracking                   You're collecting interview/hire data
+         Build follow-up automation                   Users report outcomes at > 30% rate
+         ("Did you get the interview?")
+         Aggregate quality signals by segment          You know which prompts work for
+                                                       which user segments
+         MOAT 2 (Network Data) starts compounding
+
+12       Outcome data reaches statistical              Prediction accuracy improves
+         significance (1000+ labeled outcomes)         measurably quarter-over-quarter
+         Per-segment prompt optimization               Different user types get
+         informed by outcome data                      different (better) experiences
+         MOAT 3 (Proprietary Eval) starts compounding
+
+18       Predictive features launch                    "This job will close in 5 days"
+         ("Based on 10K outcomes, we predict...")      "Users like you got hired 73%
+         Full flywheel is spinning                      of the time when they applied
+                                                        within 48 hours"
+```
+
+### What Makes It a Moat vs Just Data
+
+```
+JUST DATA:                              ACTUAL MOAT:
+
+"We have 1M AI interactions"            "We have 1M interactions WITH outcome labels
+                                         AND per-user preference models
+→ Anyone can get this in a month         AND we know which prompt strategies work
+  with scale                             for which user segments"
+
+                                        → Takes 12+ months to replicate
+                                          regardless of funding or team size
+
+
+THE MOAT FORMULA:
+
+  Moat Strength = (Labeled Data Volume) × (Feedback Loop Speed) × (Time)
+
+  • Labeled Data: not just logs, but outcomes — did it WORK?
+  • Speed: how fast does new data improve the product?
+  • Time: how long have you been accumulating? (this can't be bought)
+```
+
+### Making the Moat Visible to Users
+
+Users who **feel** the product getting better have higher retention and willingness to pay. Make the moat visible.
+
+```
+VISIBILITY PATTERN           EXAMPLE                                    WHERE TO SHOW
+
+Preference count             "Matched based on 47 learned preferences"  Match card
+Learning acknowledgment      "We noticed you prefer remote roles.       Settings/profile
+                              Updated your preferences."
+Confidence from data         "Based on 10,000 similar matches, this     Match explanation
+                              is a strong fit for you (87% confidence)"
+Improvement over time        "Your match quality has improved 23%       Dashboard/email
+                              since you started 3 months ago"
+Outcome-informed             "3 users with similar profiles got hired   Match card
+                              at this company in the last 6 months"
+Data ownership               "Your data: 147 interactions, 12 outcomes, Settings
+                              47 learned preferences. Export anytime."
+```
+
+**Enforcement [DOCS ONLY]**: Every AI-facing feature must include at least one moat visibility element. Document in feature spec which element and where it appears.
+
+### Prompt A/B Testing via PostHog
+
+Use PostHog feature flags to route users to different prompt versions and measure which performs better.
+
+```typescript
+/**
+ * Prompt A/B testing using PostHog feature flags
+ *
+ * WHY: Prompt changes are high-risk. A "better" prompt might improve quality
+ *      for one segment and degrade it for another. A/B testing catches this.
+ *
+ * HOW: PostHog flag determines prompt version per user.
+ *      ai_generations table logs which version was used.
+ *      Weekly analysis compares quality_score by prompt_version.
+ */
+
+async function getPromptForUser(
+  userId: string,
+  taskType: string
+): Promise<PromptVersion> {
+  // PostHog determines which prompt version this user gets
+  const variant = posthog.getFeatureFlag('prompt-version-' + taskType, userId);
+
+  // Map flag variant to prompt version
+  const versionMap: Record<string, string> = {
+    control: 'v2.3',    // Current production prompt
+    test:    'v2.4',     // New candidate prompt
+  };
+
+  const version = versionMap[variant as string] ?? 'v2.3'; // Safe fallback
+  return await db.promptVersions.findUnique({ where: { name: taskType, version } });
+}
+
+// Analysis query: which prompt version is better?
+// Run weekly, results inform promotion decision
+const analysis = await db.$queryRaw`
+  SELECT
+    prompt_version,
+    COUNT(*) as total_generations,
+    AVG(quality_score) as avg_quality,
+    AVG(CASE WHEN user_feedback = 'accepted' THEN 1.0 ELSE 0.0 END) as accept_rate,
+    AVG(CASE WHEN hallucination THEN 1.0 ELSE 0.0 END) as hallucination_rate,
+    AVG(cost_usd) as avg_cost
+  FROM ai_generations
+  WHERE task_type = 'job-matching'
+    AND created_at > NOW() - INTERVAL '7 days'
+  GROUP BY prompt_version
+  ORDER BY avg_quality DESC
+`;
+```
+
+### Moat Health Dashboard
+
+Monthly metrics that tell you whether your moat is growing or stagnating.
+
+```
+MOAT HEALTH METRICS — MONTHLY REVIEW
+
+METRIC                              TARGET          ALERT IF          SOURCE
+
+Plane 3 Data Volume
+  ai_generations rows (monthly)     Growing 20%+    Flat or declining  PostgreSQL
+  Outcome labels collected          > 30% of gens   < 10%             outcomes table
+  Feedback rate (any user signal)   > 50% of gens   < 20%             ai_generations
+
+Personalization Depth (Moat 1)
+  Users with 50+ interactions       Growing         Declining          user_preferences
+  Retention: 50+ vs <10 actions     2x+ gap         < 1.5x gap        PostHog cohort
+  Avg preferences per active user   Growing         Stagnant           user_preferences
+
+Network Data (Moat 2)
+  Few-shot bank refresh rate        Weekly          > 30 days stale    few_shot_bank
+  Quality score trend (global)      Improving       Flat > 3 months    ai_generations
+  Accept rate trend (global)        Improving       Flat > 3 months    ai_generations
+
+Proprietary Evaluation (Moat 3)
+  Labeled outcomes collected        Growing         < 50/month         outcomes
+  Prediction accuracy               Improving       Declining          outcomes + ai_gen
+  Outcome follow-up response rate   > 30%           < 10%              outcomes
+
+Flywheel Speed
+  Time from interaction → few-shot  < 7 days        > 30 days          batch job logs
+  Time from outcome → model update  < 14 days       > 60 days          batch job logs
+  New prompt version frequency      1-2x/month      > 60 days stale    prompt_versions
+```
+
+**Enforcement [SOFT CHECK]**: Monthly product review must include moat health metrics. Template added to `docs/templates/monthly-moat-review.md`. Non-coder reviews this alongside cost report (Section 18).
+
+### Moat Defense: What Competitors Would Need to Replicate
+
+```
+TO REPLICATE YOUR MOAT, A COMPETITOR NEEDS:
+
+Moat 1 (Personalization):
+  ✗ They can't buy this — it requires MONTHS of per-user data
+  ✗ Each user starts from zero on a competing platform
+  ✗ Even with identical models and prompts, they lack per-user context
+  Time to replicate: 6-12 months PER USER
+
+Moat 2 (Network Data):
+  ✗ They need a comparable user base to generate aggregate signals
+  ✗ Synthetic data can bootstrap but lacks real-world quality
+  ✗ Few-shot bank quality depends on volume of real interactions
+  Time to replicate: 6-12 months with comparable user growth
+
+Moat 3 (Proprietary Evaluation):
+  ✗ They need real-world outcomes (interviews, hires) — can't be faked
+  ✗ Outcome data collection requires user follow-up infrastructure
+  ✗ Statistical significance requires 1000+ labeled outcomes
+  Time to replicate: 12-24 months minimum
+
+COMBINED:
+  A well-funded competitor launching today with the same model, same team size,
+  and same budget starts at ZERO for all three moat types. They cannot buy time.
+```
+
+### When NOT to Focus on Moat Building
+
+```
+IF YOUR PRODUCT...                          THEN INSTEAD...
+──────────────────────────────────────────  ────────────────────────────────────
+Hasn't found product-market fit             Find PMF first. Log everything, but
+                                            don't invest in moat infrastructure.
+Has < 100 users                             Focus on acquisition. Moat without
+                                            users is a moat around an empty castle.
+Is in a winner-take-all market              Speed matters more than moat.
+                                            Ship fast, accumulate data passively.
+Is a one-time-use tool                      Moat doesn't apply. Compete on
+                                            quality and distribution instead.
+Is B2B with < 10 enterprise customers       Relationships and integrations
+                                            are your moat, not data flywheel.
+```
+
+---
+
 ## Appendix A: Reference Stack
 
 Default tool picks to avoid selection churn. Replace with your preference, but start here:
@@ -4590,6 +5665,13 @@ User analytics             PostHog (self-hosted)        Amplitude, Mixpanel     
 Uptime monitoring          Better Uptime                UptimeRobot                 Free
 Mobile testing             Playwright device emulation  BrowserStack (real devices) Free
 Performance CI             Lighthouse CI                SpeedCurve                  Free
+Prompt versioning          PostgreSQL table             Promptfoo                   Free
+Prompt A/B testing         PostHog feature flags        LaunchDarkly ($10/seat)     Free tier
+Few-shot bank              PostgreSQL + cron job        Langfuse datasets           Free
+AI quality logging         PostgreSQL (ai_generations)  Langfuse (self-hosted)      Free
+Outcome tracking           PostgreSQL (outcomes table)  Custom                      Free
+User preference learning   PostgreSQL + batch jobs      Custom                      Free
+Data flywheel analysis     PostgreSQL + SQL             Metabase (self-hosted)      Free
 ```
 
 **Notes**:
