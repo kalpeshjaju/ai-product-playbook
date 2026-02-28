@@ -15,6 +15,7 @@ import type { PlaybookEntry, AdminUser } from '@playbook/shared-types';
 import { checkTokenBudget } from './rate-limiter.js';
 import { verifyTurnstileToken } from './middleware/turnstile.js';
 import { handlePromptRoutes } from './routes/prompts.js';
+import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 
 // Sentry — no-op when DSN not set
 const sentryDsn = process.env.SENTRY_DSN;
@@ -26,6 +27,9 @@ if (sentryDsn) {
     sendDefaultPii: false,
   });
 }
+
+// PostHog server-side — no-op when POSTHOG_SERVER_API_KEY not set
+initPostHogServer();
 
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
 
@@ -130,4 +134,10 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   // Railway expects stdout for health check logs
   process.stdout.write(`API server running on port ${PORT}\n`);
+});
+
+// Graceful shutdown — flush PostHog events
+process.on('SIGTERM', async () => {
+  await shutdownPostHog();
+  server.close();
 });

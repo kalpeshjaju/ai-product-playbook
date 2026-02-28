@@ -25,3 +25,30 @@ export type {
 
 export { FallbackMonitor, fallbackMonitor } from './fallback-monitor.js';
 export type { FallbackEvent, FallbackStats, AlertLevel } from './fallback-monitor.js';
+
+// ─── Tier 2: Agent Memory Layer (§20) ───────────────────────────────────────
+export { createMemoryProvider, Mem0Provider, ZepProvider } from './memory/index.js';
+export type {
+  AgentMemoryProvider,
+  MemoryEntry,
+  MemorySearchResult,
+  AddMemoryOptions,
+  SearchMemoryOptions,
+} from './memory/index.js';
+
+// ─── Tier 2: Composio Agent Tool Integrations (§20) ────────────────────────
+export { createComposioClient, getAvailableActions, executeAction } from './composio/index.js';
+export type { ComposioAction, ComposioActionResult } from './composio/index.js';
+
+// ─── Tier 2: Intelligent Model Routing (§18) ───────────────────────────────
+export { routeQuery } from './routing/index.js';
+export type { ModelTier, RoutingConfig, RoutingDecision } from './routing/index.js';
+
+// ─── Tier 2: OpenPipe Fine-Tuning Pipeline (§20) ───────────────────────────
+export {
+  createOpenPipeClient,
+  logTrainingData,
+  triggerFineTune,
+  getFineTuneStatus,
+} from './openpipe/index.js';
+export type { TrainingEntry, FineTuneStatus } from './openpipe/index.js';

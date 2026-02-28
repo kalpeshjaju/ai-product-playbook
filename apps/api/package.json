@@ -17,6 +17,7 @@
   "dependencies": {
     "@playbook/shared-types": "*",
     "@sentry/node": "^10.40.0",
+    "posthog-node": "^4.0.0",
     "drizzle-orm": "^0.39.0",
     "ioredis": "^5.4.0",
     "postgres": "^3.4.0"

@@ -1,0 +1,27 @@
+# DSPy Prompt Optimization Configuration
+#
+# WHY: Controls the teacher/student models, trial count, and quality threshold
+#      for automated prompt optimization (Playbook §20).
+# HOW: Read by optimize.py at startup. Teacher model generates demonstrations,
+#      student model is the target for the optimized prompt.
+
+# Teacher model — generates high-quality demonstrations for few-shot
+# Uses LiteLLM model aliases (must match services/litellm/config.yaml)
+teacher_model: "claude-sonnet"
+
+# Student model — the target model for the optimized prompt
+# Typically a cheaper/faster model that benefits from optimization
+student_model: "claude-haiku"
+
+# Number of optimization trials to run
+num_trials: 10
+
+# Minimum quality metric score to promote a prompt
+# Prompts scoring below this threshold are not POSTed to the API
+metric_threshold: 0.8
+
+# Maximum bootstrapped demonstrations per optimized prompt
+max_bootstrapped_demos: 4
+
+# Maximum labeled demonstrations per optimized prompt
+max_labeled_demos: 8

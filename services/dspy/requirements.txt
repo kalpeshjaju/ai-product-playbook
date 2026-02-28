@@ -1,0 +1,6 @@
+# DSPy prompt optimization service dependencies
+dspy-ai>=2.5.0
+litellm>=1.50.0
+psycopg2-binary>=2.9.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.0

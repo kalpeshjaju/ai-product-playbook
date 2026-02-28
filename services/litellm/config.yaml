@@ -51,6 +51,20 @@ litellm_settings:
   success_callback: ["langfuse"]
   failure_callback: ["langfuse"]
 
+# ─── Router settings (§18 RouteLLM — cost-optimized model routing) ───
+# Maps tier aliases from packages/shared-llm/src/routing/router.ts
+# to model groups. LiteLLM uses lowest-cost routing within each group.
+router_settings:
+  routing_strategy: "cost-based-routing"
+  model_group_alias:
+    fast-tier: "gpt-4o-mini"
+    balanced-tier: "claude-haiku"
+    quality-tier: "claude-sonnet"
+  num_retries: 2
+  retry_after: 5
+  allowed_fails: 3
+  cooldown_time: 60
+
 # ─── General settings ───────────────────────────────────────────────
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
