@@ -64,6 +64,9 @@ Every AI product has four distinct pillars. This playbook covers all four:
 17. [Testing Strategy for Fluid AI Products](#17-testing-strategy-for-fluid-ai-products) — Visual Regression, Streaming E2E, Non-Deterministic Output, Over-Mocking Detection
 18. [Cost Control, Observability & Abuse Prevention](#18-cost-control-observability--abuse-prevention) — LLM Gateway, Model Routing, Denial-of-Wallet, LLM Response Resilience, Dual-Layer Cost Tracking
 19. [Data Ingestion & Living Inputs](#19-data-ingestion--living-inputs) — Multi-Modal Parsing, Embedding Versioning, Enrichment, Voice, Freshness
+20. [AI Product Intelligence Stack](#20-ai-product-intelligence-stack) — 4-Layer Model, RAG vs Fine-Tuning Decision Framework, Company Case Studies, Context Injection Patterns
+21. [Data Architecture for AI Moats](#21-data-architecture-for-ai-moats) — Three Data Planes, AI Quality Schema, Outcome-Labeled Data, Per-User Preference Learning, Feedback Loops
+22. [Competitive Moat & Flywheel Design](#22-competitive-moat--flywheel-design) — Data Flywheel, Three Moat Types, Moat Sequencing, Prompt A/B Testing, Moat Health Metrics
 A. [Reference Stack](#appendix-a-reference-stack)
 B. [Industry Context (February 2026)](#appendix-b-industry-context-february-2026)
 C. [Validation Report Summary](#appendix-c-validation-report-summary)

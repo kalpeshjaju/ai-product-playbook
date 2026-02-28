@@ -42,3 +42,4 @@ test-results/
 # Misc
 *.log
 tmp/
+.vercel
