@@ -1,0 +1,12 @@
+# Crawl4AI Scraper — Railway deployment config
+#
+# WHY: Self-hosted web scraping service, replaces Firecrawl API ($16/mo).
+# HOW: FastAPI on port 8000, health check at /health. Restarts on failure.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

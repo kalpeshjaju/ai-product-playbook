@@ -21,7 +21,7 @@ describe('DocumentIngester', () => {
   });
 
   it('ingests plain text with correct IngestResult shape', async () => {
-    const result = await ingester.ingest(Buffer.from('Hello world'), { metadata: { source: 'test' } });
+    const result = await ingester.ingest(Buffer.from('Hello world'), 'text/plain', { metadata: { source: 'test' } });
     expect(result).not.toBeNull();
     expect(result!.text).toBe('Hello world');
     expect(result!.sourceType).toBe('document');
@@ -31,7 +31,7 @@ describe('DocumentIngester', () => {
   });
 
   it('ingests markdown', async () => {
-    const result = await ingester.ingest(Buffer.from('# Title\n\nBody'), { metadata: {} });
+    const result = await ingester.ingest(Buffer.from('# Title\n\nBody'), 'text/markdown', { metadata: {} });
     expect(result).not.toBeNull();
     expect(result!.mimeType).toBe('text/markdown');
     expect(result!.text).toContain('# Title');
@@ -39,7 +39,7 @@ describe('DocumentIngester', () => {
 
   it('preserves rawSource when option is set', async () => {
     const buf = Buffer.from('hello');
-    const result = await ingester.ingest(buf, { metadata: {} });
+    const result = await ingester.ingest(buf, 'text/plain', { metadata: {} });
     expect(result!.rawSource).toEqual(buf);
   });
 });

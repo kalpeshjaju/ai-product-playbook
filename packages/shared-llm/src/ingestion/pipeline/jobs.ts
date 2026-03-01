@@ -3,8 +3,10 @@
  * WHY: §19 — enrichment pipeline needs typed job payloads for each async operation.
  */
 
+import type { JobTypeValue } from './queue.js';
+
 export interface IngestionJobData {
-  type: string;
+  type: JobTypeValue;
   documentId: string;
   payload: Record<string, unknown>;
 }

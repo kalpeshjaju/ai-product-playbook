@@ -8,6 +8,7 @@ import { Worker } from 'bullmq';
 import type { Job } from 'bullmq';
 import type { IngestionJobData } from './jobs.js';
 import { JobType } from './queue.js';
+import { parseRedisConnection } from './connection.js';
 
 type JobProcessor = (job: Job<IngestionJobData>) => Promise<void>;
 
@@ -42,9 +43,6 @@ export function createIngestionWorker(
   redisUrl?: string,
   concurrency = 5,
 ): Worker<IngestionJobData> {
-  const url = redisUrl ?? process.env.REDIS_URL ?? 'redis://localhost:6379';
-  const parsed = new URL(url);
-
   return new Worker<IngestionJobData>(
     'ingestion-pipeline',
     async (job) => {
@@ -55,12 +53,7 @@ export function createIngestionWorker(
       await processor(job);
     },
     {
-      connection: {
-        host: parsed.hostname,
-        port: parseInt(parsed.port || '6379', 10),
-        password: parsed.password || undefined,
-        tls: parsed.protocol === 'rediss:' ? {} : undefined,
-      },
+      connection: parseRedisConnection(redisUrl),
       concurrency,
     },
   );

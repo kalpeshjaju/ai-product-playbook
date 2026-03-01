@@ -20,7 +20,11 @@ export class ApiFeedIngester implements Ingester {
     return mimeType === 'application/x-api-feed';
   }
 
-  async ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
+  supportedMimeTypes(): string[] {
+    return ['application/x-api-feed'];
+  }
+
+  async ingest(content: Buffer, _mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
     let payload: ApiFeedPayload;
     try {
       payload = JSON.parse(content.toString('utf-8')) as ApiFeedPayload;

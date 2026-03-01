@@ -5,9 +5,10 @@ import type { Ingester, IngestResult } from '../src/ingestion/types.js';
 function makeFakeIngester(mimeTypes: string[]): Ingester {
   return {
     canHandle: (mime) => mimeTypes.includes(mime),
+    supportedMimeTypes: () => mimeTypes,
     ingest: async (content) => ({
       text: content.toString('utf-8'),
-      sourceType: 'test',
+      sourceType: 'document',
       mimeType: mimeTypes[0]!,
       contentHash: 'hash',
       metadata: {},
@@ -44,7 +45,7 @@ describe('IngesterRegistry', () => {
 
     const result = await registry.ingest(Buffer.from('hello'), 'text/plain');
     expect(result?.text).toBe('hello');
-    expect(result?.sourceType).toBe('test');
+    expect(result?.sourceType).toBe('document');
   });
 
   it('ingest returns null for unhandled MIME type', async () => {

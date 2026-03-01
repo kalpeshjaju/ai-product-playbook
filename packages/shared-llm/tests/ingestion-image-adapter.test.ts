@@ -17,7 +17,7 @@ describe('ImageIngester', () => {
     vi.stubEnv('ZEROX_ENABLED', 'false');
     vi.stubEnv('TESSERACT_ENABLED', 'false');
 
-    const result = await ingester.ingest(Buffer.from('fake-image'));
+    const result = await ingester.ingest(Buffer.from('fake-image'), 'image/png');
     expect(result).toBeNull();
 
     vi.unstubAllEnvs();
@@ -40,7 +40,7 @@ describe('ImageIngester', () => {
     // Re-import to pick up mock
     const { ImageIngester: MockedIngester } = await import('../src/ingestion/adapters/image.js');
     const mockedIngester = new MockedIngester();
-    const result = await mockedIngester.ingest(Buffer.from('fake-png'));
+    const result = await mockedIngester.ingest(Buffer.from('fake-png'), 'image/png');
 
     if (result) {
       expect(result.sourceType).toBe('image');

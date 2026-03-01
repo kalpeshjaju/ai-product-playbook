@@ -36,10 +36,11 @@ describe('AudioIngester', () => {
       }),
     });
 
-    const result = await ingester.ingest(Buffer.from('fake-audio'));
+    const result = await ingester.ingest(Buffer.from('fake-audio'), 'audio/wav');
     expect(result).not.toBeNull();
     expect(result!.text).toBe('Hello from audio');
     expect(result!.sourceType).toBe('audio');
+    expect(result!.mimeType).toBe('audio/wav');
     expect(result!.metadata.confidence).toBe(0.95);
     expect(result!.metadata.durationSeconds).toBe(5.0);
     expect(result!.contentHash).toHaveLength(64);
@@ -49,7 +50,7 @@ describe('AudioIngester', () => {
     vi.stubEnv('DEEPGRAM_API_KEY', '');
     delete process.env.DEEPGRAM_API_KEY;
 
-    const result = await ingester.ingest(Buffer.from('audio'));
+    const result = await ingester.ingest(Buffer.from('audio'), 'audio/wav');
     expect(result).toBeNull();
   });
 
@@ -62,7 +63,7 @@ describe('AudioIngester', () => {
       }),
     });
 
-    await ingester.ingest(Buffer.from('audio'), { metadata: { diarize: true } });
+    await ingester.ingest(Buffer.from('audio'), 'audio/wav', { metadata: { diarize: true } });
     const callUrl = vi.mocked(globalThis.fetch).mock.calls[0]![0] as string;
     expect(callUrl).toContain('diarize=true');
   });

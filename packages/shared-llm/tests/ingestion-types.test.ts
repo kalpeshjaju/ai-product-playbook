@@ -22,6 +22,7 @@ describe('ingestion types', () => {
   it('Ingester interface is implementable', () => {
     const ingester: Ingester = {
       canHandle: (mime: string) => mime === 'text/plain',
+      supportedMimeTypes: () => ['text/plain'],
       ingest: async (content: Buffer) => ({
         text: content.toString('utf-8'),
         sourceType: 'document',
@@ -32,5 +33,6 @@ describe('ingestion types', () => {
     };
     expect(ingester.canHandle('text/plain')).toBe(true);
     expect(ingester.canHandle('image/png')).toBe(false);
+    expect(ingester.supportedMimeTypes()).toEqual(['text/plain']);
   });
 });

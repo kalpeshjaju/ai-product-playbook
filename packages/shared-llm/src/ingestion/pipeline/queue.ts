@@ -6,6 +6,7 @@
 
 import { Queue } from 'bullmq';
 import type { IngestionJobData } from './jobs.js';
+import { parseRedisConnection } from './connection.js';
 
 export const JobType = {
   EMBED: 'embed',
@@ -21,16 +22,8 @@ export type JobTypeValue = (typeof JobType)[keyof typeof JobType];
 const QUEUE_NAME = 'ingestion-pipeline';
 
 export function createIngestionQueue(redisUrl?: string): Queue<IngestionJobData> {
-  const url = redisUrl ?? process.env.REDIS_URL ?? 'redis://localhost:6379';
-  const parsed = new URL(url);
-
   return new Queue<IngestionJobData>(QUEUE_NAME, {
-    connection: {
-      host: parsed.hostname,
-      port: parseInt(parsed.port || '6379', 10),
-      password: parsed.password || undefined,
-      tls: parsed.protocol === 'rediss:' ? {} : undefined,
-    },
+    connection: parseRedisConnection(redisUrl),
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },

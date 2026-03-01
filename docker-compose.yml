@@ -70,6 +70,19 @@ services:
       timeout: 5s
       retries: 3
 
+  crawl4ai:
+    build:
+      context: ./services/crawl4ai
+      dockerfile: Dockerfile
+    ports:
+      - "${CRAWL4AI_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   api:
     build:
       context: .
@@ -83,12 +96,15 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - LITELLM_PROXY_URL=http://litellm:4000/v1
       - LITELLM_API_KEY=${LITELLM_MASTER_KEY}
+      - CRAWL4AI_URL=http://crawl4ai:8000
     depends_on:
       litellm:
         condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      crawl4ai:
         condition: service_healthy
     # Overrides Dockerfile HEALTHCHECK for local dev (compose healthcheck takes precedence)
     healthcheck:

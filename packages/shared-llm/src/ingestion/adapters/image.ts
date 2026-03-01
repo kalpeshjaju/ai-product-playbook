@@ -19,26 +19,30 @@ export class ImageIngester implements Ingester {
     return IMAGE_TYPES.has(mimeType);
   }
 
-  async ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
+  supportedMimeTypes(): string[] {
+    return [...IMAGE_TYPES];
+  }
+
+  async ingest(content: Buffer, mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
     const zeroxEnabled = process.env.ZEROX_ENABLED !== 'false' && !!process.env.ZEROX_MODEL;
     const tesseractEnabled = process.env.TESSERACT_ENABLED !== 'false';
 
     // Try Zerox first (higher quality)
     if (zeroxEnabled) {
-      const result = await this.ingestViaZerox(content, options);
+      const result = await this.ingestViaZerox(content, mimeType, options);
       if (result) return result;
     }
 
     // Fallback to Tesseract
     if (tesseractEnabled) {
-      return this.ingestViaTesseract(content, options);
+      return this.ingestViaTesseract(content, mimeType, options);
     }
 
     process.stderr.write('WARN: No OCR engine available — set ZEROX_MODEL or TESSERACT_ENABLED\n');
     return null;
   }
 
-  private async ingestViaZerox(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
+  private async ingestViaZerox(content: Buffer, mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
     try {
       const { zerox } = await import('zerox');
       const model = process.env.ZEROX_MODEL ?? 'gpt-4o-mini';
@@ -66,7 +70,7 @@ export class ImageIngester implements Ingester {
         return {
           text,
           sourceType: 'image',
-          mimeType: 'image/png',
+          mimeType,
           contentHash: computeContentHash(text),
           metadata: {
             ...options?.metadata,
@@ -85,7 +89,7 @@ export class ImageIngester implements Ingester {
     }
   }
 
-  private async ingestViaTesseract(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
+  private async ingestViaTesseract(content: Buffer, mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
     try {
       const Tesseract = await import('tesseract.js');
       const recognize = Tesseract.default?.recognize ?? Tesseract.recognize;
@@ -96,7 +100,7 @@ export class ImageIngester implements Ingester {
       return {
         text: data.text.trim(),
         sourceType: 'image',
-        mimeType: 'image/png',
+        mimeType,
         contentHash: computeContentHash(data.text.trim()),
         metadata: {
           ...options?.metadata,

@@ -10,10 +10,13 @@ import { createHash } from 'node:crypto';
 /** Chunking strategies — determines how text is split before embedding. */
 export type ChunkStrategy = 'fixed' | 'semantic' | 'sliding-window' | 'per-entity';
 
+/** Source modality — typed union instead of bare string. */
+export type SourceType = 'document' | 'audio' | 'image' | 'web' | 'csv' | 'api';
+
 /** Result produced by every ingestion adapter. */
 export interface IngestResult {
   text: string;
-  sourceType: string;
+  sourceType: SourceType;
   mimeType: string;
   contentHash: string;
   metadata: Record<string, unknown>;
@@ -31,7 +34,8 @@ export interface IngestOptions {
 /** Adapter interface — every modality implements this. */
 export interface Ingester {
   canHandle(mimeType: string): boolean;
-  ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null>;
+  supportedMimeTypes(): string[];
+  ingest(content: Buffer, mimeType: string, options?: IngestOptions): Promise<IngestResult | null>;
 }
 
 /** Compute SHA-256 content hash. Shared utility for all adapters. */

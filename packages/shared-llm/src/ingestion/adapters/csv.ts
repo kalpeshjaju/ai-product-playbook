@@ -18,7 +18,11 @@ export class CsvIngester implements Ingester {
     return CSV_TYPES.has(mimeType);
   }
 
-  async ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
+  supportedMimeTypes(): string[] {
+    return [...CSV_TYPES];
+  }
+
+  async ingest(content: Buffer, _mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
     const mimeType = this.detectType(content);
 
     if (mimeType === 'text/csv') {

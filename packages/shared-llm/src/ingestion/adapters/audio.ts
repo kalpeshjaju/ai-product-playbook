@@ -19,7 +19,11 @@ export class AudioIngester implements Ingester {
     return AUDIO_TYPES.has(mimeType);
   }
 
-  async ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
+  supportedMimeTypes(): string[] {
+    return [...AUDIO_TYPES];
+  }
+
+  async ingest(content: Buffer, mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
     const apiKey = process.env.DEEPGRAM_API_KEY;
     if (!apiKey) {
       process.stderr.write('INFO: DEEPGRAM_API_KEY not set — audio ingestion unavailable\n');
@@ -48,9 +52,9 @@ export class AudioIngester implements Ingester {
           method: 'POST',
           headers: {
             'Authorization': `Token ${apiKey}`,
-            'Content-Type': 'audio/wav',
+            'Content-Type': mimeType,
           },
-          body: new Uint8Array(content),
+          body: content,
         });
 
         if (!response.ok && !isRetryableStatus(response.status)) return null;
@@ -82,7 +86,7 @@ export class AudioIngester implements Ingester {
         return {
           text: alt.transcript,
           sourceType: 'audio',
-          mimeType: 'audio/wav',
+          mimeType,
           contentHash: computeContentHash(alt.transcript),
           metadata: {
             ...options?.metadata,

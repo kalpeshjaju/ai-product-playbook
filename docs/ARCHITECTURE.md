@@ -5,7 +5,7 @@
 
 ## System Overview
 
-**Turborepo monorepo** with 3 apps, 3 packages, and 2 services:
+**Turborepo monorepo** with 3 apps, 3 packages, and 3 services:
 
 ```
 ai-product-playbook/
@@ -19,7 +19,8 @@ ai-product-playbook/
 │   └── shared-ui/    # Shared UI components
 └── services/
     ├── litellm/      # LiteLLM proxy — unified LLM gateway
-    └── dspy/         # DSPy prompt optimization service
+    ├── dspy/         # DSPy prompt optimization service
+    └── crawl4ai/     # Crawl4AI web scraper — URL-to-markdown service
 ```
 
 ## LLM Gateway
@@ -100,6 +101,8 @@ Content → IngesterRegistry → [DocumentIngester | AudioIngester | ImageIngest
 ```
 
 **Adapters:** Each implements the `Ingester` interface (`canHandle` + `ingest`). Registry dispatches by MIME type. Adding a new modality = implement `Ingester` + register it.
+
+**Web scraping:** The `WebIngester` calls the self-hosted **Crawl4AI** service (`services/crawl4ai/`) — a FastAPI wrapper around headless Chromium that returns clean markdown. No external API keys required (replaces Firecrawl).
 
 **Chunking:** 4 strategies — fixed (default), sliding-window (transcripts), per-entity (CSV rows), semantic (stub, LLM-based boundary detection deferred).
 

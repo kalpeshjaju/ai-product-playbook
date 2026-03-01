@@ -22,7 +22,7 @@ describe('ApiFeedIngester', () => {
     });
 
     const payload = JSON.stringify({ url: 'https://api.example.com/data', method: 'GET' });
-    const result = await ingester.ingest(Buffer.from(payload));
+    const result = await ingester.ingest(Buffer.from(payload), 'application/x-api-feed');
 
     expect(result).not.toBeNull();
     expect(result!.text).toContain('title');
@@ -30,14 +30,14 @@ describe('ApiFeedIngester', () => {
   });
 
   it('returns null on invalid JSON payload', async () => {
-    const result = await ingester.ingest(Buffer.from('not json'));
+    const result = await ingester.ingest(Buffer.from('not json'), 'application/x-api-feed');
     expect(result).toBeNull();
   });
 
   it('returns null on fetch failure', async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
     const payload = JSON.stringify({ url: 'https://api.example.com/data' });
-    const result = await ingester.ingest(Buffer.from(payload));
+    const result = await ingester.ingest(Buffer.from(payload), 'application/x-api-feed');
     expect(result).toBeNull();
   });
 });

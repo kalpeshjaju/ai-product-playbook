@@ -8,15 +8,24 @@ import type { SupportedMimeType } from '../../parsing/index.js';
 import type { Ingester, IngestResult, IngestOptions } from '../types.js';
 import { computeContentHash } from '../types.js';
 
+const DOCUMENT_TYPES = [
+  'text/plain', 'text/markdown', 'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+
 export class DocumentIngester implements Ingester {
   canHandle(mimeType: string): boolean {
     return isSupportedMimeType(mimeType);
   }
 
-  async ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
-    // Detect MIME type from content if possible, default to text/plain
-    const mimeType = this.detectMimeType(content);
-    const parsed = await parseDocument(content, mimeType);
+  supportedMimeTypes(): string[] {
+    return DOCUMENT_TYPES;
+  }
+
+  async ingest(content: Buffer, mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
+    // Use passed mimeType if it's a supported type, otherwise detect from content
+    const resolvedMime = isSupportedMimeType(mimeType) ? mimeType as SupportedMimeType : this.detectMimeType(content);
+    const parsed = await parseDocument(content, resolvedMime);
     if (!parsed) return null;
 
     return {

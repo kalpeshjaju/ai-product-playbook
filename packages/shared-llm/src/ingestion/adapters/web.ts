@@ -1,65 +1,62 @@
 /**
- * FILE PURPOSE: Web scraping adapter via Firecrawl API
+ * FILE PURPOSE: Web scraping adapter via Crawl4AI microservice
  * WHY: §19 — URL ingestion with JS rendering and clean markdown output.
- *      Uses Firecrawl's /v1/scrape endpoint (REST, no SDK).
+ *      Calls the self-hosted Crawl4AI service (services/crawl4ai/) via REST.
+ *      Replaces Firecrawl to eliminate external API cost.
  */
 
 import type { Ingester, IngestResult, IngestOptions } from '../types.js';
 import { computeContentHash } from '../types.js';
+
+const DEFAULT_CRAWL4AI_URL = 'http://localhost:8000';
 
 export class WebIngester implements Ingester {
   canHandle(mimeType: string): boolean {
     return mimeType === 'text/x-uri';
   }
 
-  async ingest(content: Buffer, options?: IngestOptions): Promise<IngestResult | null> {
-    const apiKey = process.env.FIRECRAWL_API_KEY;
-    if (!apiKey) {
-      process.stderr.write('INFO: FIRECRAWL_API_KEY not set — web ingestion unavailable\n');
-      return null;
-    }
+  supportedMimeTypes(): string[] {
+    return ['text/x-uri'];
+  }
 
+  async ingest(content: Buffer, _mimeType: string, options?: IngestOptions): Promise<IngestResult | null> {
+    const baseUrl = process.env.CRAWL4AI_URL ?? DEFAULT_CRAWL4AI_URL;
     const url = content.toString('utf-8').trim();
 
     try {
-      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      const response = await fetch(`${baseUrl}/scrape`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url,
-          formats: ['markdown'],
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
       });
 
       if (!response.ok) {
-        process.stderr.write(`WARN: Firecrawl API returned ${response.status}\n`);
+        process.stderr.write(`WARN: Crawl4AI service returned ${response.status}\n`);
         return null;
       }
 
       const json = await response.json() as {
         success: boolean;
-        data?: { markdown?: string; metadata?: Record<string, unknown> };
+        markdown: string;
+        metadata: Record<string, unknown>;
       };
 
-      if (!json.success || !json.data?.markdown) return null;
+      if (!json.success || !json.markdown) return null;
 
       return {
-        text: json.data.markdown,
+        text: json.markdown,
         sourceType: 'web',
         mimeType: 'text/markdown',
-        contentHash: computeContentHash(json.data.markdown),
+        contentHash: computeContentHash(json.markdown),
         metadata: {
           ...options?.metadata,
           url,
           scrapedAt: new Date().toISOString(),
-          ...json.data.metadata,
+          ...json.metadata,
         },
       };
     } catch (err) {
-      process.stderr.write(`WARN: Firecrawl scrape failed: ${err}\n`);
+      process.stderr.write(`WARN: Crawl4AI scrape failed: ${err}\n`);
       return null;
     }
   }

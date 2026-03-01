@@ -13,7 +13,7 @@ describe('CsvIngester', () => {
 
   it('parses CSV content to structured text', async () => {
     const csv = 'name,age,role\nAlice,30,Engineer\nBob,25,Designer';
-    const result = await ingester.ingest(Buffer.from(csv));
+    const result = await ingester.ingest(Buffer.from(csv), 'text/csv');
     expect(result).not.toBeNull();
     expect(result!.text).toContain('Alice');
     expect(result!.text).toContain('Bob');
@@ -23,12 +23,12 @@ describe('CsvIngester', () => {
   });
 
   it('returns null for empty CSV', async () => {
-    const result = await ingester.ingest(Buffer.from(''));
+    const result = await ingester.ingest(Buffer.from(''), 'text/csv');
     expect(result).toBeNull();
   });
 
   it('handles CSV with only headers', async () => {
-    const result = await ingester.ingest(Buffer.from('name,age,role\n'));
+    const result = await ingester.ingest(Buffer.from('name,age,role\n'), 'text/csv');
     expect(result).toBeNull();
   });
 });
