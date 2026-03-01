@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "product_pages",
+  "info": {
+    "singularName": "product-page",
+    "pluralName": "product-pages",
+    "displayName": "Product Page",
+    "description": "Landing pages and product content managed via CMS"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title",
+      "required": true
+    },
+    "hero_headline": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "hero_subtext": {
+      "type": "text"
+    },
+    "body": {
+      "type": "richtext"
+    },
+    "seo_title": {
+      "type": "string",
+      "maxLength": 70
+    },
+    "seo_description": {
+      "type": "text",
+      "maxLength": 160
+    },
+    "published_at_override": {
+      "type": "datetime"
+    }
+  }
+}

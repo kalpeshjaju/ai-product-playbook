@@ -48,3 +48,4 @@ test-results/
 *.log
 tmp/
 .vercel
+storybook-static/

@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "playbook_entries",
+  "info": {
+    "singularName": "playbook-entry",
+    "pluralName": "playbook-entries",
+    "displayName": "Playbook Entry",
+    "description": "Playbook patterns and practices for production AI products"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "summary": {
+      "type": "text",
+      "required": true
+    },
+    "content": {
+      "type": "richtext"
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": ["resilience", "cost", "observability", "security", "strategy", "input", "output"],
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["active", "draft", "deprecated"],
+      "default": "draft",
+      "required": true
+    },
+    "section_ref": {
+      "type": "string",
+      "maxLength": 10
+    },
+    "order": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}

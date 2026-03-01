@@ -1,0 +1,21 @@
+{
+  "name": "@playbook/strapi",
+  "version": "0.1.0",
+  "description": "Strapi CMS — headless content management for playbook product",
+  "private": true,
+  "scripts": {
+    "develop": "strapi develop",
+    "start": "strapi start",
+    "build": "strapi build",
+    "strapi": "strapi"
+  },
+  "dependencies": {
+    "@strapi/strapi": "^5.0.0",
+    "@strapi/plugin-cloud": "^5.0.0",
+    "@strapi/plugin-users-permissions": "^5.0.0",
+    "pg": "^8.12.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
