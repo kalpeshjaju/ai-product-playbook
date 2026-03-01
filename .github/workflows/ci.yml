@@ -36,6 +36,12 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # Zerox postinstall needs Ghostscript + GraphicsMagick for OCR
+      - name: Install system deps for zerox
+        run: |
+          sudo NEEDRESTART_MODE=a apt-get update -qq
+          sudo NEEDRESTART_MODE=a apt-get install -y -qq ghostscript graphicsmagick > /dev/null 2>&1
+
       - run: npm ci --legacy-peer-deps
 
       # Dependency vulnerability scan (SECURITY.md §Dependency Policy)
@@ -154,6 +160,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Install system deps for zerox
+        run: |
+          sudo NEEDRESTART_MODE=a apt-get update -qq
+          sudo NEEDRESTART_MODE=a apt-get install -y -qq ghostscript graphicsmagick > /dev/null 2>&1
+
       - run: npm ci --legacy-peer-deps
 
       - name: Enable pgvector extension
@@ -202,6 +213,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+
+      - name: Install system deps for zerox
+        run: |
+          sudo NEEDRESTART_MODE=a apt-get update -qq
+          sudo NEEDRESTART_MODE=a apt-get install -y -qq ghostscript graphicsmagick > /dev/null 2>&1
 
       - run: npm ci --legacy-peer-deps
 

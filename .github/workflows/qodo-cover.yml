@@ -39,8 +39,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Install system deps for zerox
+        run: |
+          sudo NEEDRESTART_MODE=a apt-get update -qq
+          sudo NEEDRESTART_MODE=a apt-get install -y -qq ghostscript graphicsmagick > /dev/null 2>&1
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Get changed files
         id: changed
