@@ -11,6 +11,11 @@ import { chunkFixed } from './fixed.js';
 
 const CODE_BLOCK_RE = /```[\s\S]*?```/g;
 
+// Sentinel markers for code block placeholders (Unicode private-use chars, safe from lint)
+const SENTINEL_START = '\uE000';
+const SENTINEL_END = '\uE001';
+const SENTINEL_RE = new RegExp(`${SENTINEL_START}CODE_BLOCK_(\\d+)${SENTINEL_END}`, 'g');
+
 /**
  * Split text into sentences at `.!?`, double newlines, and markdown headers.
  * Preserves fenced code blocks as single units.
@@ -18,11 +23,11 @@ const CODE_BLOCK_RE = /```[\s\S]*?```/g;
 export function splitIntoSentences(text: string): string[] {
   if (!text.trim()) return [];
 
-  // Extract code blocks, replace with placeholders
+  // Extract code blocks, replace with placeholders using Unicode private-use sentinels
   const codeBlocks: string[] = [];
   const withPlaceholders = text.replace(CODE_BLOCK_RE, (match) => {
     codeBlocks.push(match);
-    return `\x00CODE_BLOCK_${codeBlocks.length - 1}\x00`;
+    return `${SENTINEL_START}CODE_BLOCK_${codeBlocks.length - 1}${SENTINEL_END}`;
   });
 
   // Split on sentence-ending punctuation, double newlines, or markdown headers
@@ -33,7 +38,7 @@ export function splitIntoSentences(text: string): string[] {
   // Restore code blocks and filter empties
   return rawParts
     .map((part) =>
-      part.replace(/\x00CODE_BLOCK_(\d+)\x00/g, (_, idx) => codeBlocks[Number(idx)] ?? ''),
+      part.replace(SENTINEL_RE, (_, idx) => codeBlocks[Number(idx)] ?? ''),
     )
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
