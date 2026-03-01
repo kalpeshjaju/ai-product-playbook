@@ -88,8 +88,20 @@ jobs:
 
       # PR template enforcement (PR-only)
       - name: Check PR template
+        id: pr-template
         if: github.event_name == 'pull_request'
         run: bash scripts/check-pr-template.sh
+
+      - name: Capture PR template failure
+        if: failure() && steps.pr-template.outcome == 'failure'
+        run: |
+          bash scripts/capture-feedback.sh \
+            --type ci-failure \
+            --source ci \
+            --summary "PR template missing required sections" \
+            --bucket config-mismatch \
+            --automatable true \
+            --automatable-as pre-commit-hook || true
 
       # Preview deploy verification (PR-only, UI changes)
       - name: Check preview deploy
@@ -100,8 +112,22 @@ jobs:
 
       # Hallucination detection
       - name: Hallucination check
+        id: hallucination
         if: github.event_name == 'pull_request'
-        run: bash scripts/hallucination_check.sh --base ${{ github.event.pull_request.base.ref || 'main' }}
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+        run: bash scripts/hallucination_check.sh --base "$BASE_REF"
+
+      - name: Capture hallucination failure
+        if: failure() && steps.hallucination.outcome == 'failure'
+        run: |
+          bash scripts/capture-feedback.sh \
+            --type ci-failure \
+            --source ci \
+            --summary "Hallucination check failed — fabricated data or debug artifacts" \
+            --bucket hallucinated-import \
+            --automatable true \
+            --automatable-as eslint-rule || true
 
   # ─── Python checks ───────────────────────────────────────────────
   python:
