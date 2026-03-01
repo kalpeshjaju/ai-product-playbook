@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { PostHogProvider } from '../providers/posthog-provider';
 import { ClerkProviderShell } from '../providers/clerk-provider-shell';
 import { NavLink } from '@playbook/shared-ui';
@@ -73,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AppShell>{children}</AppShell>
           )}
         </PostHogProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
