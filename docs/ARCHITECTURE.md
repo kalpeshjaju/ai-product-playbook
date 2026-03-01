@@ -5,7 +5,7 @@
 
 ## System Overview
 
-**Turborepo monorepo** with 3 apps, 2 packages, and 2 services:
+**Turborepo monorepo** with 3 apps, 3 packages, and 2 services:
 
 ```
 ai-product-playbook/
@@ -15,7 +15,8 @@ ai-product-playbook/
 │   └── admin/        # Admin dashboard
 ├── packages/
 │   ├── shared-llm/   # LLM utilities, identity, cost ledger, eval
-│   └── shared-types/ # TypeScript types shared across apps
+│   ├── shared-types/ # TypeScript types shared across apps
+│   └── shared-ui/    # Shared UI components
 └── services/
     ├── litellm/      # LiteLLM proxy — unified LLM gateway
     └── dspy/         # DSPy prompt optimization service

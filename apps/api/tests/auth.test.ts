@@ -144,69 +144,69 @@ describe('authenticateRequest', () => {
     clearApiKeyCache();
   });
 
-  it('passes public routes without x-api-key', () => {
+  it('passes public routes without x-api-key', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/health');
+    const result = await authenticateRequest(req, res, '/api/health');
     expect(result).not.toBeNull();
     expect(result!.tier).toBe('public');
   });
 
-  it('returns 401 when x-api-key is missing on user routes', () => {
+  it('returns 401 when no auth is provided on user routes', async () => {
     vi.stubEnv('API_KEYS', 'key-1,key-2');
     clearApiKeyCache();
     const req = createMockReq('GET');
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/preferences/user1');
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
     expect(result).toBeNull();
     expect(res._statusCode).toBe(401);
-    expect(res._body).toContain('x-api-key header missing');
   });
 
-  it('returns 401 when x-api-key is invalid', () => {
+  it('returns 401 when x-api-key is invalid', async () => {
     vi.stubEnv('API_KEYS', 'key-1,key-2');
     clearApiKeyCache();
     const req = createMockReq('GET', { 'x-api-key': 'wrong-key' });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/preferences/user1');
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
     expect(result).toBeNull();
     expect(res._statusCode).toBe(401);
     expect(res._body).toContain('invalid API key');
   });
 
-  it('passes when x-api-key is valid', () => {
+  it('passes when x-api-key is valid', async () => {
     vi.stubEnv('API_KEYS', 'key-1,key-2');
     clearApiKeyCache();
     const req = createMockReq('GET', { 'x-api-key': 'key-1' });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/preferences/user1');
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
     expect(result).not.toBeNull();
     expect(result!.tier).toBe('user');
+    expect(result!.authMethod).toBe('api-key');
   });
 
-  it('passes in fail-open mode when API_KEYS is empty', () => {
+  it('passes in fail-open mode when API_KEYS is empty', async () => {
     vi.stubEnv('API_KEYS', '');
     clearApiKeyCache();
     const req = createMockReq('GET', { 'x-api-key': 'any-key' });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/preferences/user1');
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
     expect(result).not.toBeNull();
     expect(result!.tier).toBe('user');
   });
 
-  it('returns 403 when x-admin-key is missing on admin routes', () => {
+  it('returns 403 when x-admin-key is missing on admin routes', async () => {
     vi.stubEnv('API_KEYS', 'key-1');
     vi.stubEnv('ADMIN_API_KEY', 'admin-secret');
     clearApiKeyCache();
     const req = createMockReq('POST', { 'x-api-key': 'key-1' });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/prompts');
+    const result = await authenticateRequest(req, res, '/api/prompts');
     expect(result).toBeNull();
     expect(res._statusCode).toBe(403);
     expect(res._body).toContain('admin access required');
   });
 
-  it('returns 403 when x-admin-key is wrong', () => {
+  it('returns 403 when x-admin-key is wrong', async () => {
     vi.stubEnv('API_KEYS', 'key-1');
     vi.stubEnv('ADMIN_API_KEY', 'admin-secret');
     clearApiKeyCache();
@@ -215,12 +215,12 @@ describe('authenticateRequest', () => {
       'x-admin-key': 'wrong-admin',
     });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/prompts');
+    const result = await authenticateRequest(req, res, '/api/prompts');
     expect(result).toBeNull();
     expect(res._statusCode).toBe(403);
   });
 
-  it('passes admin routes when both keys are valid', () => {
+  it('passes admin routes when both keys are valid', async () => {
     vi.stubEnv('API_KEYS', 'key-1');
     vi.stubEnv('ADMIN_API_KEY', 'admin-secret');
     clearApiKeyCache();
@@ -229,12 +229,13 @@ describe('authenticateRequest', () => {
       'x-admin-key': 'admin-secret',
     });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/prompts');
+    const result = await authenticateRequest(req, res, '/api/prompts');
     expect(result).not.toBeNull();
     expect(result!.tier).toBe('admin');
+    expect(result!.authMethod).toBe('api-key');
   });
 
-  it('returns 403 when ADMIN_API_KEY env is not set', () => {
+  it('returns 403 when ADMIN_API_KEY env is not set', async () => {
     vi.stubEnv('API_KEYS', 'key-1');
     vi.stubEnv('ADMIN_API_KEY', '');
     delete process.env.ADMIN_API_KEY;
@@ -244,7 +245,7 @@ describe('authenticateRequest', () => {
       'x-admin-key': 'anything',
     });
     const res = createMockRes();
-    const result = authenticateRequest(req, res, '/api/costs/reset');
+    const result = await authenticateRequest(req, res, '/api/costs/reset');
     expect(result).toBeNull();
     expect(res._statusCode).toBe(403);
   });

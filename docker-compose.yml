@@ -98,5 +98,34 @@ services:
       retries: 3
       start_period: 15s
 
+  strapi:
+    build:
+      context: ./services/strapi
+      dockerfile: Dockerfile
+    ports:
+      - "${STRAPI_PORT:-1337}:1337"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=1337
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${POSTGRES_DB:-playbook}
+      - DATABASE_USERNAME=${POSTGRES_USER}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - DATABASE_SCHEMA=strapi
+      - APP_KEYS=${STRAPI_APP_KEYS:-strapi-key-1,strapi-key-2}
+      - ADMIN_JWT_SECRET=${STRAPI_ADMIN_JWT_SECRET:-strapi-admin-jwt-secret}
+      - API_TOKEN_SALT=${STRAPI_API_TOKEN_SALT:-strapi-api-token-salt}
+      - TRANSFER_TOKEN_SALT=${STRAPI_TRANSFER_TOKEN_SALT:-strapi-transfer-salt}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1337/_health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   pgdata:

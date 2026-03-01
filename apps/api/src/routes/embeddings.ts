@@ -8,6 +8,8 @@
  * HOW: Cosine similarity search via raw SQL (Drizzle doesn't support
  *      pgvector's <=> operator). Direct insertion for manual embeddings.
  *
+ * rateLimited: server-level — checkTokenBudget + checkCostBudget applied in server.ts
+ *
  * Routes:
  *   GET  /api/embeddings/search?q=...&limit=10&modelId=... — semantic search
  *   POST /api/embeddings                                    — direct embedding insertion

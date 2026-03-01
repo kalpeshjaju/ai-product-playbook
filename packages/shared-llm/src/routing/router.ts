@@ -9,6 +9,8 @@
  *      explicit tier requests). Maps to model aliases configured in LiteLLM.
  *      Disabled when ROUTELLM_ENABLED is not 'true'.
  *
+ * rateLimited: server-level — checkTokenBudget + checkCostBudget applied in apps/api/src/server.ts
+ *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-02-28
  */

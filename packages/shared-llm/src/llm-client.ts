@@ -5,6 +5,8 @@
  *      Every app calls LiteLLM instead of providers directly.
  * HOW: OpenAI-compatible client pointing at the LiteLLM proxy URL.
  *
+ * rateLimited: server-level — checkTokenBudget + checkCostBudget applied in apps/api/src/server.ts
+ *
  * USAGE:
  *   import { createLLMClient } from '@playbook/shared-llm';
  *   const llm = createLLMClient();

@@ -9,6 +9,8 @@
  *      LiteLLM proxy, and stores both the document and embedding rows.
  *      Dedup via SHA-256 content hash. Fail-open if embedding generation fails.
  *
+ * rateLimited: server-level — checkTokenBudget + checkCostBudget applied in server.ts
+ *
  * Routes:
  *   POST /api/documents          — ingest a document (chunk + embed)
  *   POST /api/documents/upload   — binary upload (PDF/DOCX) via Unstructured.io

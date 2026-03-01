@@ -28,4 +28,4 @@
 - [ ] No secrets in code (use environment variables)
 - [ ] No raw user input in prompts without sanitization
 - [ ] No internal tracebacks exposed to clients
-  **Enforced by**: GitGuardian pre-commit + Semgrep CI
+  **Enforced by**: GitGuardian pre-commit + npm audit CI gate

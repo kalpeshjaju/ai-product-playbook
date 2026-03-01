@@ -11,6 +11,7 @@
     "lint": "next lint --max-warnings 0"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.39.0",
     "@playbook/shared-types": "*",
     "@playbook/shared-ui": "*",
     "@sentry/nextjs": "^9.0.0",

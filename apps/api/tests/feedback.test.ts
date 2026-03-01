@@ -100,6 +100,16 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 import { handleFeedbackRoutes } from '../src/routes/feedback.js';
+import type { AuthResult } from '../src/middleware/auth.js';
+
+const TEST_USER_ID = 'test-user-1';
+
+function createMockAuthResult(userId = TEST_USER_ID): AuthResult {
+  return {
+    userContext: { userId, source: 'api_key' },
+    tier: 'user',
+  };
+}
 
 function createMockReq(method: string): IncomingMessage {
   return { method, headers: {} } as IncomingMessage;
@@ -137,6 +147,7 @@ describe('handleFeedbackRoutes', () => {
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1',
       createBodyParser({}),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Provide at least one of');
@@ -148,6 +159,7 @@ describe('handleFeedbackRoutes', () => {
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1',
       createBodyParser({ userFeedback: 'invalid_value' }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Invalid userFeedback');
@@ -159,12 +171,21 @@ describe('handleFeedbackRoutes', () => {
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1',
       createBodyParser({ thumbs: 5 }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('thumbs must be -1, 0, or 1');
   });
 
   it('PATCH /api/feedback/:id updates feedback and returns 200', async () => {
+    // Mock: ownership check — generation belongs to authenticated user
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ id: 'gen-uuid-1', userId: TEST_USER_ID }]),
+    };
+    mockSelect.mockReturnValue(selectChain);
+
     const updatedRow = {
       id: 'gen-uuid-1',
       userFeedback: 'accepted',
@@ -184,6 +205,7 @@ describe('handleFeedbackRoutes', () => {
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1',
       createBodyParser({ userFeedback: 'accepted', thumbs: 1 }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(200);
     const body = JSON.parse(res._body) as Record<string, unknown>;
@@ -192,46 +214,57 @@ describe('handleFeedbackRoutes', () => {
   });
 
   it('PATCH /api/feedback/:id returns 404 when generation is not found', async () => {
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    // Mock: ownership check — generation not found
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    };
+    mockSelect.mockReturnValue(selectChain);
 
     const req = createMockReq('PATCH');
     const res = createMockRes();
     await handleFeedbackRoutes(
       req, res, '/api/feedback/nonexistent-id',
       createBodyParser({ thumbs: -1 }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(404);
     expect(res._body).toContain('Generation not found');
   });
 
-  // ── POST /api/feedback/:id/outcome ───────────────────────────────────────
+  it('PATCH /api/feedback/:id returns 403 when generation belongs to another user', async () => {
+    // Mock: generation exists but belongs to a different user
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ id: 'gen-uuid-1', userId: 'other-user' }]),
+    };
+    mockSelect.mockReturnValue(selectChain);
 
-  it('POST /api/feedback/:id/outcome returns 400 when required fields are missing', async () => {
-    const req = createMockReq('POST');
+    const req = createMockReq('PATCH');
     const res = createMockRes();
     await handleFeedbackRoutes(
-      req, res, '/api/feedback/gen-uuid-1/outcome',
-      createBodyParser({ outcomeType: 'conversion' }),
+      req, res, '/api/feedback/gen-uuid-1',
+      createBodyParser({ thumbs: 1 }),
+      createMockAuthResult(),
     );
-    expect(res._statusCode).toBe(400);
-    expect(res._body).toContain('Required');
+    expect(res._statusCode).toBe(403);
+    expect(res._body).toContain('Forbidden');
   });
 
-  it('POST /api/feedback/:id/outcome returns 400 when only userId is provided', async () => {
+  // ── POST /api/feedback/:id/outcome ───────────────────────────────────────
+
+  it('POST /api/feedback/:id/outcome returns 400 when outcomeType is missing', async () => {
     const req = createMockReq('POST');
     const res = createMockRes();
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1/outcome',
-      createBodyParser({ userId: 'user-1' }),
+      createBodyParser({}),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(400);
-    expect(res._body).toContain('Required');
+    expect(res._body).toContain('Required: outcomeType');
   });
 
   it('POST /api/feedback/:id/outcome returns 400 for invalid outcomeType', async () => {
@@ -239,14 +272,14 @@ describe('handleFeedbackRoutes', () => {
     const res = createMockRes();
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1/outcome',
-      createBodyParser({ outcomeType: 'bogus_type', userId: 'user-1' }),
+      createBodyParser({ outcomeType: 'bogus_type' }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Invalid outcomeType');
   });
 
   it('POST /api/feedback/:id/outcome returns 404 when generation is not found', async () => {
-    // Mock: select for generation existence check returns empty
     const selectChain = {
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
@@ -258,26 +291,45 @@ describe('handleFeedbackRoutes', () => {
     const res = createMockRes();
     await handleFeedbackRoutes(
       req, res, '/api/feedback/nonexistent-id/outcome',
-      createBodyParser({ outcomeType: 'conversion', userId: 'user-1' }),
+      createBodyParser({ outcomeType: 'conversion' }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(404);
     expect(res._body).toContain('Generation not found');
   });
 
-  it('POST /api/feedback/:id/outcome creates outcome and returns 201', async () => {
-    // Mock: generation exists
+  it('POST /api/feedback/:id/outcome returns 403 when generation belongs to another user', async () => {
     const selectChain = {
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ id: 'gen-uuid-1' }]),
+      limit: vi.fn().mockResolvedValue([{ id: 'gen-uuid-1', userId: 'other-user' }]),
     };
     mockSelect.mockReturnValue(selectChain);
 
-    // Mock: insert outcome
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handleFeedbackRoutes(
+      req, res, '/api/feedback/gen-uuid-1/outcome',
+      createBodyParser({ outcomeType: 'conversion' }),
+      createMockAuthResult(),
+    );
+    expect(res._statusCode).toBe(403);
+    expect(res._body).toContain('Forbidden');
+  });
+
+  it('POST /api/feedback/:id/outcome creates outcome with auth userId and returns 201', async () => {
+    // Mock: generation exists and belongs to authenticated user
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ id: 'gen-uuid-1', userId: TEST_USER_ID }]),
+    };
+    mockSelect.mockReturnValue(selectChain);
+
     const createdOutcome = {
       id: 'outcome-uuid-1',
       generationId: 'gen-uuid-1',
-      userId: 'user-1',
+      userId: TEST_USER_ID,
       outcomeType: 'conversion',
       outcomeValue: null,
     };
@@ -291,11 +343,13 @@ describe('handleFeedbackRoutes', () => {
     const res = createMockRes();
     await handleFeedbackRoutes(
       req, res, '/api/feedback/gen-uuid-1/outcome',
-      createBodyParser({ outcomeType: 'conversion', userId: 'user-1' }),
+      createBodyParser({ outcomeType: 'conversion' }),
+      createMockAuthResult(),
     );
     expect(res._statusCode).toBe(201);
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.id).toBe('outcome-uuid-1');
+    expect(body.userId).toBe(TEST_USER_ID);
     expect(body.outcomeType).toBe('conversion');
   });
 
@@ -304,7 +358,7 @@ describe('handleFeedbackRoutes', () => {
   it('returns 404 for unmatched feedback routes', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    await handleFeedbackRoutes(req, res, '/api/feedback', createBodyParser({}));
+    await handleFeedbackRoutes(req, res, '/api/feedback', createBodyParser({}), createMockAuthResult());
     expect(res._statusCode).toBe(404);
   });
 });

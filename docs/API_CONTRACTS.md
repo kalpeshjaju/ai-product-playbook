@@ -13,15 +13,18 @@
 | Header | Required | Description |
 |--------|----------|-------------|
 | `Content-Type` | Yes (POST/PATCH) | `application/json` |
-| `x-api-key` | No | User API key (used for identity + rate limiting) |
+| `x-api-key` | Yes (non-public routes) | User API key — required for all routes except `/api/health`, `/api/entries`, `/api/users` |
+| `x-admin-key` | Yes (admin routes) | Admin key for mutation routes (costs/reset, composio/execute, documents, etc.) |
 | `x-turnstile-token` | Yes (chat routes) | Cloudflare Turnstile bot verification token |
 
 ## CORS
 
-All routes return:
-- `Access-Control-Allow-Origin: *`
-- `Access-Control-Allow-Headers: Content-Type, x-api-key, x-turnstile-token`
-- `Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS`
+When `ALLOWED_ORIGINS` env var is set, only listed origins receive `Access-Control-Allow-Origin`.
+When not set, falls back to `*` (development mode).
+
+- `Access-Control-Allow-Origin: <request origin>` (if in allowlist) or `*` (fallback)
+- `Access-Control-Allow-Headers: Content-Type, x-api-key, x-turnstile-token, x-admin-key`
+- `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS`
 
 ---
 
@@ -828,7 +831,7 @@ Soft-delete a few-shot example (sets `isActive=false`).
 
 ## Cost Budget Guard
 
-Cost budget enforcement on `/api/chat*` and `/api/generate*` routes (after rate limiter):
+Cost budget enforcement on `/api/chat*`, `/api/generate*`, `/api/documents*`, and `/api/embeddings*` routes (after rate limiter):
 
 - **Budget**: Configurable via `MAX_COST` env var (default: $10.00)
 - **Response** `429`:
@@ -843,7 +846,7 @@ Cost budget enforcement on `/api/chat*` and `/api/generate*` routes (after rate 
 
 ## Rate Limiting
 
-Token-based rate limiting on `/api/chat*` and `/api/generate*` routes:
+Token-based rate limiting on `/api/chat*`, `/api/generate*`, `/api/documents*`, and `/api/embeddings*` routes:
 
 - **Budget**: 100,000 tokens/user/day
 - **Window**: Sliding 24-hour via Redis

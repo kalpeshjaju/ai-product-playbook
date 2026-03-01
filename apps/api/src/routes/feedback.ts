@@ -19,6 +19,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { eq } from 'drizzle-orm';
 import { db, aiGenerations, outcomes } from '../db/index.js';
+import type { AuthResult } from '../middleware/auth.js';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -31,7 +32,10 @@ export async function handleFeedbackRoutes(
   res: ServerResponse,
   url: string,
   parseBody: BodyParser,
+  authResult: AuthResult,
 ): Promise<void> {
+  const authenticatedUserId = authResult.userContext.userId;
+
   try {
   // POST /api/feedback/:generationId/outcome
   const outcomeMatch = url.match(/^\/api\/feedback\/([^/]+)\/outcome$/);
@@ -39,11 +43,10 @@ export async function handleFeedbackRoutes(
     const generationId = outcomeMatch[1]!;
     const body = await parseBody(req);
     const outcomeType = body.outcomeType as string | undefined;
-    const userId = body.userId as string | undefined;
 
-    if (!outcomeType || !userId) {
+    if (!outcomeType) {
       res.statusCode = 400;
-      res.end(JSON.stringify({ error: 'Required: outcomeType, userId' }));
+      res.end(JSON.stringify({ error: 'Required: outcomeType' }));
       return;
     }
 
@@ -55,9 +58,9 @@ export async function handleFeedbackRoutes(
       return;
     }
 
-    // Verify the generation exists
+    // Verify the generation exists and belongs to the authenticated user
     const [generation] = await db
-      .select({ id: aiGenerations.id })
+      .select({ id: aiGenerations.id, userId: aiGenerations.userId })
       .from(aiGenerations)
       .where(eq(aiGenerations.id, generationId))
       .limit(1);
@@ -68,11 +71,17 @@ export async function handleFeedbackRoutes(
       return;
     }
 
+    if (generation.userId !== authenticatedUserId) {
+      res.statusCode = 403;
+      res.end(JSON.stringify({ error: 'Forbidden: you can only add outcomes to your own generations' }));
+      return;
+    }
+
     const [created] = await db
       .insert(outcomes)
       .values({
         generationId,
-        userId,
+        userId: authenticatedUserId,
         outcomeType,
         outcomeValue: (body.outcomeValue as Record<string, unknown>) ?? null,
       })
@@ -116,6 +125,25 @@ export async function handleFeedbackRoutes(
       return;
     }
 
+    // Verify the generation exists and belongs to the authenticated user
+    const [existing] = await db
+      .select({ id: aiGenerations.id, userId: aiGenerations.userId })
+      .from(aiGenerations)
+      .where(eq(aiGenerations.id, generationId))
+      .limit(1);
+
+    if (!existing) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: `Generation not found: ${generationId}` }));
+      return;
+    }
+
+    if (existing.userId !== authenticatedUserId) {
+      res.statusCode = 403;
+      res.end(JSON.stringify({ error: 'Forbidden: you can only update feedback on your own generations' }));
+      return;
+    }
+
     // Build update object with only provided fields
     const updates: Record<string, unknown> = {
       feedbackAt: new Date(),
@@ -129,12 +157,6 @@ export async function handleFeedbackRoutes(
       .set(updates)
       .where(eq(aiGenerations.id, generationId))
       .returning();
-
-    if (!updated) {
-      res.statusCode = 404;
-      res.end(JSON.stringify({ error: `Generation not found: ${generationId}` }));
-      return;
-    }
 
     res.end(JSON.stringify(updated));
     return;

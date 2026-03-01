@@ -107,7 +107,7 @@ const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, x-turnstile-token, x-admin-key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-turnstile-token, x-admin-key');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
 
   // CORS preflight
@@ -146,8 +146,8 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // ─── Authentication (API key validation) ───
-  const authResult = authenticateRequest(req, res, url);
+  // ─── Authentication (API key + Clerk JWT validation) ───
+  const authResult = await authenticateRequest(req, res, url);
   if (!authResult) return; // 401/403 already sent
 
   // ─── IDOR prevention (user-scoped routes) ───
@@ -177,7 +177,7 @@ const server = createServer(async (req, res) => {
   }
 
   // ─── Token-based rate limiting on LLM routes (§18) ───
-  if (url.startsWith('/api/chat') || url.startsWith('/api/generate')) {
+  if (url.startsWith('/api/chat') || url.startsWith('/api/generate') || url.startsWith('/api/documents') || url.startsWith('/api/embeddings')) {
     const userId = getUserId(req);
     const budget = await checkTokenBudget(userId, 500); // estimate 500 tokens per request
     if (!budget.allowed) {
@@ -240,7 +240,7 @@ const server = createServer(async (req, res) => {
 
   // ─── Feedback + Outcomes (§22) ───
   if (url.startsWith('/api/feedback')) {
-    await handleFeedbackRoutes(req, res, url, parseBody);
+    await handleFeedbackRoutes(req, res, url, parseBody, authResult);
     return;
   }
 
