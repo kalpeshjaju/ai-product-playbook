@@ -1,3 +1,5 @@
 {
-  "file_allowlist": []
+  "file_allowlist": [
+    "packages/shared-llm/tests/ingestion-pipeline.test.ts"
+  ]
 }
