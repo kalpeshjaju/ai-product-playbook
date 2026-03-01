@@ -1,7 +1,8 @@
 export type { IngestResult, IngestOptions, Ingester, ChunkStrategy, SourceType } from './types.js';
 export { computeContentHash } from './types.js';
 export { IngesterRegistry } from './registry.js';
-export { chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, selectChunker } from './chunking/index.js';
+export { chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, chunkSemanticAsync, selectChunker } from './chunking/index.js';
+export type { SemanticChunkOptions } from './chunking/index.js';
 export { DocumentIngester } from './adapters/document.js';
 export { AudioIngester } from './adapters/audio.js';
 export { ImageIngester } from './adapters/image.js';
@@ -15,5 +16,6 @@ export { createIngestionQueue, JobType } from './pipeline/queue.js';
 export type { JobTypeValue } from './pipeline/queue.js';
 export type { IngestionJobData } from './pipeline/jobs.js';
 export { createIngestionWorker } from './pipeline/workers.js';
+export type { JobProcessor } from './pipeline/workers.js';
 export { parseRedisConnection } from './pipeline/connection.js';
 export type { RedisConnectionOptions } from './pipeline/connection.js';

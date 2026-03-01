@@ -26,7 +26,10 @@ import {
   createLLMClient,
   costLedger,
   routeQuery,
+  createIngestionQueue,
+  JobType,
 } from '@playbook/shared-llm';
+import type { IngestionJobData } from '@playbook/shared-llm';
 
 // ─── Constants ───
 
@@ -151,6 +154,60 @@ async function generateEmbeddings(
   }
 }
 
+// ─── Queue integration (fail-open) ───
+
+let ingestionQueue: ReturnType<typeof createIngestionQueue> | null = null;
+
+function getQueue(): ReturnType<typeof createIngestionQueue> | null {
+  if (!process.env.REDIS_URL) return null;
+  if (!ingestionQueue) {
+    ingestionQueue = createIngestionQueue();
+  }
+  return ingestionQueue;
+}
+
+/**
+ * Enqueue async enrichment jobs after a document is persisted.
+ * Fail-open: queue unavailability does not break the sync persist flow.
+ */
+export async function enqueuePostPersistJobs(
+  documentId: string,
+  validUntil?: string,
+): Promise<void> {
+  const queue = getQueue();
+  if (!queue) return;
+
+  try {
+    const enrichJob: IngestionJobData = {
+      type: JobType.ENRICH,
+      documentId,
+      payload: {},
+    };
+    const dedupJob: IngestionJobData = {
+      type: JobType.DEDUP_CHECK,
+      documentId,
+      payload: {},
+    };
+
+    await Promise.all([
+      queue.add(JobType.ENRICH, enrichJob),
+      queue.add(JobType.DEDUP_CHECK, dedupJob),
+    ]);
+
+    if (validUntil) {
+      const delayMs = Math.max(0, new Date(validUntil).getTime() - Date.now());
+      const freshnessJob: IngestionJobData = {
+        type: JobType.FRESHNESS,
+        documentId,
+        payload: {},
+      };
+      await queue.add(JobType.FRESHNESS, freshnessJob, { delay: delayMs });
+    }
+  } catch (err) {
+    process.stderr.write(`WARN: Failed to enqueue post-persist jobs: ${err}\n`);
+  }
+}
+
 // ─── Main persistence function ───
 
 /**
@@ -234,6 +291,9 @@ export async function persistDocument(input: PersistDocumentInput): Promise<Pers
     }));
     await db.insert(embeddings).values(embeddingRows);
   }
+
+  // 6. Enqueue async enrichment jobs (fail-open)
+  await enqueuePostPersistJobs(doc.id, validUntil);
 
   return {
     documentId: doc.id,

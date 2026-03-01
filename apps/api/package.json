@@ -13,11 +13,14 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "vitest run"
+    "test": "vitest run",
+    "worker": "node dist/worker.js",
+    "worker:dev": "tsx src/worker.ts"
   },
   "dependencies": {
     "@clerk/backend": "^2.33.0",
     "@playbook/shared-llm": "*",
+    "bullmq": "^5.70.1",
     "@playbook/shared-types": "*",
     "@sentry/node": "^10.40.0",
     "drizzle-orm": "^0.39.0",

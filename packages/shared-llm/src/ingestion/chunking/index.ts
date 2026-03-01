@@ -12,7 +12,8 @@ import { chunkSemantic } from './semantic.js';
 export { chunkFixed } from './fixed.js';
 export { chunkSlidingWindow } from './sliding-window.js';
 export { chunkPerEntity } from './per-entity.js';
-export { chunkSemantic } from './semantic.js';
+export { chunkSemantic, chunkSemanticAsync } from './semantic.js';
+export type { SemanticChunkOptions } from './semantic.js';
 
 type Chunker = (text: string) => string[];
 

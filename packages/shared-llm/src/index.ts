@@ -96,11 +96,12 @@ export type { RequestLike, UserContext, LangfuseHeaders } from './identity/index
 export type {
   IngestResult, IngestOptions, Ingester, ChunkStrategy, SourceType,
   NearDedupResult, JobTypeValue, IngestionJobData, RedisConnectionOptions,
+  SemanticChunkOptions, JobProcessor,
 } from './ingestion/index.js';
 export {
   computeContentHash, IngesterRegistry,
   DocumentIngester, AudioIngester, ImageIngester, WebIngester, CsvIngester, ApiFeedIngester,
   computeFreshnessMultiplier, isHashDuplicate, cosineSimilarity, NEAR_DEDUP_THRESHOLD,
-  chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, selectChunker,
+  chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, chunkSemanticAsync, selectChunker,
   createIngestionQueue, JobType, createIngestionWorker, parseRedisConnection,
 } from './ingestion/index.js';

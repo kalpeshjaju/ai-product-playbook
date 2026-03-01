@@ -1,45 +1,27 @@
 /**
- * FILE PURPOSE: BullMQ worker definitions for ingestion pipeline
+ * FILE PURPOSE: BullMQ worker factory for ingestion pipeline
  * WHY: §19 — processes embed, enrich, dedup, re-embed, freshness, scrape jobs.
- *      Each processor is idempotent (safe to retry).
+ *      Accepts external processors map so apps/api can provide DB-aware implementations
+ *      while shared-llm stays DB-agnostic.
  */
 
 import { Worker } from 'bullmq';
 import type { Job } from 'bullmq';
 import type { IngestionJobData } from './jobs.js';
-import { JobType } from './queue.js';
 import { parseRedisConnection } from './connection.js';
 
-type JobProcessor = (job: Job<IngestionJobData>) => Promise<void>;
+export type JobProcessor = (job: Job<IngestionJobData>) => Promise<void>;
 
-const processors: Record<string, JobProcessor> = {
-  [JobType.EMBED]: async (job) => {
-    // TODO: Generate embeddings for document chunks
-    process.stderr.write(`INFO: Processing embed job for ${job.data.documentId}\n`);
-  },
-  [JobType.ENRICH]: async (job) => {
-    // TODO: Run enrichment graph (entity extraction, linking)
-    process.stderr.write(`INFO: Processing enrich job for ${job.data.documentId}\n`);
-  },
-  [JobType.DEDUP_CHECK]: async (job) => {
-    // TODO: Near-dedup + entity-dedup
-    process.stderr.write(`INFO: Processing dedup-check job for ${job.data.documentId}\n`);
-  },
-  [JobType.RE_EMBED]: async (job) => {
-    // TODO: Re-generate embeddings with new model
-    process.stderr.write(`INFO: Processing re-embed job for ${job.data.documentId}\n`);
-  },
-  [JobType.FRESHNESS]: async (job) => {
-    // TODO: Check valid_until, demote stale docs
-    process.stderr.write(`INFO: Processing freshness job for ${job.data.documentId}\n`);
-  },
-  [JobType.SCRAPE]: async (job) => {
-    // TODO: Firecrawl scrape + ingest
-    process.stderr.write(`INFO: Processing scrape job for ${job.data.documentId}\n`);
-  },
-};
-
+/**
+ * Create a BullMQ worker for the ingestion pipeline.
+ *
+ * @param processors - Map of job type → processor function. Provided by the caller
+ *   (e.g. apps/api) so processors can access DB, LLM clients, etc.
+ * @param redisUrl - Redis connection string (falls back to REDIS_URL env var)
+ * @param concurrency - Max concurrent job processing (default: 5)
+ */
 export function createIngestionWorker(
+  processors: Record<string, JobProcessor>,
   redisUrl?: string,
   concurrency = 5,
 ): Worker<IngestionJobData> {
