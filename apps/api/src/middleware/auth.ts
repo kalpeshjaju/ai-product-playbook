@@ -42,7 +42,8 @@ const ROUTE_RULES: RouteRule[] = [
   { prefix: '/api/health', tier: 'public' },
   { prefix: '/api/entries', methods: ['GET'], tier: 'public' },
   { prefix: '/api/entries', methods: ['POST', 'PATCH', 'DELETE'], tier: 'admin' },
-  { prefix: '/api/users', tier: 'public' },
+  // User directory contains PII (emails) — require authenticated caller
+  { prefix: '/api/users', tier: 'user' },
 
   // ADMIN — mutations that affect global state or execute external actions
   { prefix: '/api/costs/reset', methods: ['POST'], tier: 'admin' },

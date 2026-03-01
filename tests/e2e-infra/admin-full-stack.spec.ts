@@ -5,7 +5,7 @@
  *      Admin has unique routes (cost reset, prompt management, memory browser)
  *      that need the full backend stack.
  *
- * HOW: Requires full Docker stack + admin dev server on port 3001.
+ * HOW: Requires full Docker stack + admin dev server on port 3201.
  *      Run via: scripts/test-e2e-infra.sh (Layer 3)
  *
  * AUTHOR: Claude Opus 4.6
@@ -21,8 +21,13 @@ test.describe('Admin App — Full Stack', () => {
     await expect(page.getByText('Admin')).toBeVisible();
     // Users page heading
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    // User data from API (/api/users) — should show at least one user entry
-    await expect(page.locator('[data-testid="user-name"]').or(page.locator('table tbody tr')).or(page.getByRole('listitem')).first()).toBeVisible({ timeout: 10_000 });
+    // User data from API (/api/users): either rows are present or an explicit empty-state message.
+    const rows = page.locator('table tbody tr');
+    if (await rows.count()) {
+      await expect(rows.first()).toBeVisible({ timeout: 10_000 });
+    } else {
+      await expect(page.getByText('No users loaded.')).toBeVisible({ timeout: 10_000 });
+    }
   });
 
   test('admin sidebar navigation works', async ({ page }) => {

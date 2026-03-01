@@ -22,6 +22,11 @@ Use `unknown` with type guards. Untyped data is the #1 source of runtime securit
 - Use typed request parsing (not raw `req.body` casts)
 - Reject unexpected fields — don't silently pass them through
 
+### Auth and CORS hardening (2026-03-01)
+- `GET /api/users` now requires authenticated access (`user` tier) because it returns PII fields (email)
+- In production, API startup fails if `ALLOWED_ORIGINS` is not configured (unless explicit break-glass `CORS_ALLOW_ALL_IN_PRODUCTION=true`)
+- Wildcard CORS (`*`) is now restricted to non-production by default
+
 ### No secrets in code
 - Environment variables for all credentials
 - `.env` files in `.gitignore`

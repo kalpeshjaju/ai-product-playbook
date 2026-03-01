@@ -6,8 +6,8 @@
 #      Layer 1 — Vitest API contract tests (fetch → API → Postgres/Redis)
 #      Layer 2 — Playwright full-stack browser tests (browser → Next.js → API → DB)
 #
-# HOW: Requires Docker stack running (`docker compose up -d`).
-#      This script verifies services, runs tests, and reports results.
+# HOW: Works with either Docker-backed infra or externally running services.
+#      This script verifies service health, runs tests, and reports results.
 #
 # USAGE:
 #   bash scripts/test-e2e-infra.sh           # Run all layers
@@ -22,8 +22,8 @@ set -euo pipefail
 
 # ─── Configuration ────────────────────────────────────────────
 API_URL="${E2E_API_URL:-http://localhost:3002}"
-WEB_URL="${E2E_WEB_URL:-http://localhost:3000}"
-ADMIN_URL="${E2E_ADMIN_URL:-http://localhost:3001}"
+WEB_URL="${E2E_WEB_URL:-http://localhost:3200}"
+ADMIN_URL="${E2E_ADMIN_URL:-http://localhost:3201}"
 HEALTH_TIMEOUT=30
 LAYER="${1:-all}"
 
@@ -59,18 +59,22 @@ wait_for_service() {
 preflight() {
   log_info "Running pre-flight checks..."
 
-  # Check Docker is running
-  if ! docker info > /dev/null 2>&1; then
-    log_error "Docker is not running. Start Docker and run: docker compose up -d"
-    exit 1
-  fi
-
-  # Check required containers
-  local running
-  running=$(docker compose ps --status running --format '{{.Name}}' 2>/dev/null | wc -l)
-  if [ "$running" -lt 3 ]; then
-    log_warn "Expected 3+ running containers, found $running."
-    log_warn "Run: docker compose up -d"
+  if command -v docker > /dev/null 2>&1; then
+    # Check Docker daemon only when docker CLI exists.
+    if docker info > /dev/null 2>&1; then
+      local running
+      running=$(docker compose ps --status running --format '{{.Name}}' 2>/dev/null | wc -l)
+      if [ "$running" -lt 3 ]; then
+        log_warn "Expected 3+ running containers, found $running."
+        log_warn "Run: docker compose up -d"
+        log_warn "Continuing anyway — services may be running outside Docker."
+      fi
+    else
+      log_warn "Docker CLI found but daemon is not running."
+      log_warn "Continuing anyway — services may be running outside Docker."
+    fi
+  else
+    log_warn "Docker CLI not found."
     log_warn "Continuing anyway — services may be running outside Docker."
   fi
 
@@ -89,8 +93,8 @@ run_browser_tests() {
   log_info "━━━ Layer 2: Full-Stack Browser Tests (Playwright) ━━━"
 
   # Verify web and admin servers
-  wait_for_service "$WEB_URL" "Web app (port 3000)"
-  wait_for_service "$ADMIN_URL" "Admin app (port 3001)"
+  wait_for_service "$WEB_URL" "Web app (port 3200)"
+  wait_for_service "$ADMIN_URL" "Admin app (port 3201)"
 
   npx playwright test --config=playwright.e2e.config.ts
 }

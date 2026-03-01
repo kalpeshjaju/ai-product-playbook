@@ -51,8 +51,33 @@ if (sentryDsn) {
 // PostHog server-side — no-op when POSTHOG_SERVER_API_KEY not set
 initPostHogServer();
 
-// Validate auth configuration before accepting requests
-validateAuthConfig();
+function isProductionEnv(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+function isCorsBreakGlassEnabled(): boolean {
+  return process.env.CORS_ALLOW_ALL_IN_PRODUCTION === 'true';
+}
+
+/** Validate security-sensitive startup configuration before accepting requests. */
+function validateServerConfig(): void {
+  // Validate auth configuration before accepting requests
+  validateAuthConfig();
+
+  // In production, require explicit CORS allowlist unless break-glass is enabled.
+  if (isProductionEnv() && !process.env.ALLOWED_ORIGINS && !isCorsBreakGlassEnabled()) {
+    throw new Error(
+      'NODE_ENV=production requires ALLOWED_ORIGINS. ' +
+      'Set CORS_ALLOW_ALL_IN_PRODUCTION=true only as an explicit break-glass override.',
+    );
+  }
+
+  if (isProductionEnv() && isCorsBreakGlassEnabled()) {
+    process.stdout.write('WARN: CORS_ALLOW_ALL_IN_PRODUCTION=true — wildcard CORS enabled in production\n');
+  }
+}
+
+validateServerConfig();
 
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
 const startTime = Date.now();
@@ -96,10 +121,12 @@ const server = createServer(async (req, res) => {
   if (allowedOrigins && requestOrigin) {
     if (allowedOrigins.has(requestOrigin)) {
       res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+      res.setHeader('Vary', 'Origin');
     }
     // If origin is not in the allowed list, don't set the header (browser will block)
-  } else {
-    // Fallback: allow all origins when ALLOWED_ORIGINS not configured
+  } else if (!allowedOrigins && (!isProductionEnv() || isCorsBreakGlassEnabled())) {
+    // Non-production default is permissive for local dev.
+    // Production wildcard requires explicit break-glass env flag.
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
 

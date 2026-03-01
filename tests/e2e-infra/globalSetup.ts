@@ -21,6 +21,9 @@ const PORT = new URL(API_URL).port || '3002';
 const HEALTH_URL = `${API_URL}/api/health`;
 const STARTUP_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 500;
+const DEFAULT_TEST_API_KEY = 'test-api-key-for-ci';
+const DEFAULT_TEST_INTERNAL_KEY = 'test-internal-key-for-ci';
+const DEFAULT_TEST_ADMIN_KEY = 'test-admin-key-for-ci';
 
 let serverProcess: ChildProcess | null = null;
 
@@ -47,7 +50,22 @@ async function waitForHealth(timeoutMs: number): Promise<void> {
   throw new Error(`API server did not become healthy within ${timeoutMs}ms at ${HEALTH_URL}`);
 }
 
+/**
+ * Validate critical preconditions for local contract runs.
+ * CI provides these via workflow env.
+ */
+function validateContractEnv(): void {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      '[contract-tests] DATABASE_URL is required. ' +
+      'Start local infra first (Postgres + pgvector + Redis) or run in CI services.',
+    );
+  }
+}
+
 export async function setup(): Promise<void> {
+  validateContractEnv();
+
   // If server is already running (CI or manual), skip startup
   if (await isServerUp()) {
     process.stdout.write(`[contract-tests] API server already running at ${API_URL}\n`);
@@ -63,7 +81,10 @@ export async function setup(): Promise<void> {
       ...process.env,
       PORT,
       NODE_ENV: 'test',
-      API_KEYS: process.env.API_KEYS ?? '',
+      AUTH_MODE: process.env.AUTH_MODE ?? 'strict',
+      API_KEYS: process.env.API_KEYS ?? DEFAULT_TEST_API_KEY,
+      API_INTERNAL_KEY: process.env.API_INTERNAL_KEY ?? DEFAULT_TEST_INTERNAL_KEY,
+      ADMIN_API_KEY: process.env.ADMIN_API_KEY ?? DEFAULT_TEST_ADMIN_KEY,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
