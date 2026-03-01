@@ -14,7 +14,7 @@
  * LAST UPDATED: 2026-02-28
  */
 
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 const DAILY_TOKEN_BUDGET = 100_000; // §18 line 3962: 100K tokens/user/day
 const WINDOW_SECONDS = 86_400;      // 24 hours

@@ -18,7 +18,7 @@
 
 import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { eq, gt, sql, sum } from 'drizzle-orm';
+import { and, eq, gt, sql, sum } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { promptVersions } from '../db/schema.js';
 
@@ -58,8 +58,7 @@ export async function handlePromptRoutes(
     const rows = await db
       .select()
       .from(promptVersions)
-      .where(eq(promptVersions.promptName, promptName))
-      .where(gt(promptVersions.activePct, 0));
+      .where(and(eq(promptVersions.promptName, promptName), gt(promptVersions.activePct, 0)));
 
     if (rows.length === 0) {
       res.statusCode = 404;
@@ -189,8 +188,7 @@ export async function handlePromptRoutes(
     const [target] = await db
       .select()
       .from(promptVersions)
-      .where(eq(promptVersions.promptName, promptName))
-      .where(eq(promptVersions.version, version))
+      .where(and(eq(promptVersions.promptName, promptName), eq(promptVersions.version, version)))
       .limit(1);
 
     if (!target) {

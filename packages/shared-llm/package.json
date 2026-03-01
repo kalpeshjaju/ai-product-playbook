@@ -18,7 +18,8 @@
     "mem0ai": "^2.2.0",
     "openai": "^4.78.0",
     "openpipe": "^1.0.0",
-    "@getzep/zep-js": "^2.0.0"
+    "@getzep/zep-js": "^2.0.0",
+    "braintrust": "^0.0.182"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

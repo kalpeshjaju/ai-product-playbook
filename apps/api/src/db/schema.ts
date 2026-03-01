@@ -37,8 +37,9 @@ const vector = customType<{ data: number[]; driverParam: string }>({
   toDriver(value: number[]): string {
     return `[${value.join(',')}]`;
   },
-  fromDriver(value: string): number[] {
-    return value
+  fromDriver(value: unknown): number[] {
+    const str = typeof value === 'string' ? value : String(value);
+    return str
       .replace(/^\[/, '')
       .replace(/\]$/, '')
       .split(',')
