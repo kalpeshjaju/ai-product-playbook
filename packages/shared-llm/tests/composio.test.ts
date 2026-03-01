@@ -1,12 +1,11 @@
 /**
  * Tests for Composio client wrapper (composio/client.ts)
  *
- * Tests the fail-open behavior when composio-core SDK is not available.
- * SDK-dependent behavior is tested in route-level tests (apps/api/tests/composio.test.ts)
- * where the composio module exports can be mocked via standard vi.mock().
+ * Tests fail-open behavior (no API key → noop) and type contracts.
  *
- * NOTE: composio-core uses dynamic require() at runtime, which vitest's vi.mock
- * cannot intercept. This is by design — composio-core is an optional dependency.
+ * NOTE: composio-core uses CJS require() at runtime, which vitest's vi.mock
+ * cannot intercept in ESM context. Tests that need a real SDK client are
+ * in apps/api/tests/ where the module boundary can be mocked.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -14,29 +13,27 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 describe('Composio client (fail-open behavior)', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-  });
-
-  it('getAvailableActions returns empty array when SDK unavailable', async () => {
-    vi.stubEnv('COMPOSIO_API_KEY', 'test-key');
-    const { getAvailableActions } = await import('../src/composio/client.js');
-
-    // composio-core SDK is not installed in test → returns []
-    const actions = await getAvailableActions();
-    expect(actions).toEqual([]);
+    vi.resetModules();
   });
 
   it('getAvailableActions returns empty array when API key not set', async () => {
-    delete process.env.COMPOSIO_API_KEY;
-    vi.resetModules();
+    vi.stubEnv('COMPOSIO_API_KEY', '');
     const { getAvailableActions } = await import('../src/composio/client.js');
 
     const actions = await getAvailableActions();
     expect(actions).toEqual([]);
   });
 
-  it('executeAction returns noop result when SDK unavailable', async () => {
-    vi.stubEnv('COMPOSIO_API_KEY', 'test-key');
-    vi.resetModules();
+  it('getAvailableActions returns empty array when API key is undefined', async () => {
+    delete process.env.COMPOSIO_API_KEY;
+    const { getAvailableActions } = await import('../src/composio/client.js');
+
+    const actions = await getAvailableActions();
+    expect(actions).toEqual([]);
+  });
+
+  it('executeAction returns noop result when API key not set', async () => {
+    vi.stubEnv('COMPOSIO_API_KEY', '');
     const { executeAction } = await import('../src/composio/client.js');
 
     const result = await executeAction('SLACK_SEND_MESSAGE', { text: 'Hello' });
@@ -47,9 +44,8 @@ describe('Composio client (fail-open behavior)', () => {
     expect(result.metadata.executionTimeMs).toBeTypeOf('number');
   });
 
-  it('executeAction returns noop result when API key not set', async () => {
-    delete process.env.COMPOSIO_API_KEY;
-    vi.resetModules();
+  it('executeAction returns noop result with entity id when API key not set', async () => {
+    vi.stubEnv('COMPOSIO_API_KEY', '');
     const { executeAction } = await import('../src/composio/client.js');
 
     const result = await executeAction('ANY_ACTION', { param: 'value' }, 'entity-1');
@@ -57,29 +53,37 @@ describe('Composio client (fail-open behavior)', () => {
     expect(result.metadata.noop).toBe(true);
   });
 
-  it('createComposioClient is idempotent', async () => {
-    vi.stubEnv('COMPOSIO_API_KEY', 'test-key');
-    vi.resetModules();
+  it('createComposioClient is idempotent when API key not set', async () => {
+    vi.stubEnv('COMPOSIO_API_KEY', '');
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const { createComposioClient } = await import('../src/composio/client.js');
 
-    // Calling multiple times should not throw
     createComposioClient();
     createComposioClient();
     createComposioClient();
+
+    // Only logs the "disabled" message once (idempotent)
+    const disabledCalls = stderrSpy.mock.calls.filter(
+      (c) => typeof c[0] === 'string' && c[0].includes('disabled'),
+    );
+    expect(disabledCalls.length).toBe(1);
+    stderrSpy.mockRestore();
   });
 });
 
 describe('Composio types', () => {
-  it('ComposioAction has required fields', async () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('getAvailableActions returns an array', async () => {
     const { getAvailableActions } = await import('../src/composio/client.js');
 
-    // Returns array (even if empty), confirming correct type
     const actions = await getAvailableActions('slack');
     expect(Array.isArray(actions)).toBe(true);
   });
 
-  it('ComposioActionResult has correct shape', async () => {
-    vi.resetModules();
+  it('executeAction result has correct shape', async () => {
     const { executeAction } = await import('../src/composio/client.js');
 
     const result = await executeAction('TEST', {});
