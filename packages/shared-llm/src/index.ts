@@ -90,3 +90,7 @@ export {
   withLangfuseHeaders,
 } from './identity/index.js';
 export type { RequestLike, UserContext, LangfuseHeaders } from './identity/index.js';
+
+// ─── Ingestion Pipeline (§19 Input Pillar) ───────────────────────────────────
+export type { IngestResult, IngestOptions, Ingester, ChunkStrategy } from './ingestion/index.js';
+export { computeContentHash } from './ingestion/index.js';
