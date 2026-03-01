@@ -126,13 +126,15 @@ export async function handleEmbeddingRoutes(
 
     const vectorStr = `[${queryEmbedding.join(',')}]`;
 
-    // Cosine similarity search via raw SQL
+    // Cosine similarity search with freshness filter (§19 Input Pillar)
     const results = await db.execute(sql`
-      SELECT id, source_type, source_id, metadata,
-             1 - (embedding <=> ${vectorStr}::vector) AS similarity
-      FROM embeddings
-      WHERE model_id = ${modelId}
-      ORDER BY embedding <=> ${vectorStr}::vector
+      SELECT e.id, e.source_type, e.source_id, e.metadata,
+             1 - (e.embedding <=> ${vectorStr}::vector) AS similarity
+      FROM embeddings e
+      LEFT JOIN documents d ON e.source_id = d.id AND e.source_type = 'document'
+      WHERE e.model_id = ${modelId}
+        AND (d.valid_until IS NULL OR d.valid_until > NOW())
+      ORDER BY e.embedding <=> ${vectorStr}::vector
       LIMIT ${limit}
     `);
 
