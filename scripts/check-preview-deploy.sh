@@ -62,10 +62,10 @@ VERCEL_COMMENT=$(gh pr view "$PR_NUMBER" --comments --json comments \
   --jq '.comments[] | select(.author.login == "vercel[bot]") | .body' 2>/dev/null || true)
 
 if [ -z "$VERCEL_COMMENT" ]; then
-  echo "⚠️ check-preview-deploy: PR touches UI code but no Vercel preview found"
-  echo "   Ensure Vercel GitHub integration is configured for preview deploys."
-  echo "   Passing with warning (non-blocking until integration is wired)."
-  exit 0
+  echo "❌ check-preview-deploy: PR touches UI code but no Vercel preview found"
+  echo "   Ensure Vercel GitHub App is connected for preview deploys."
+  echo "   See LLM-MAINTAINED-ENTERPRISE-PLAYBOOK.md §16."
+  exit 1
 fi
 
 echo "✅ check-preview-deploy: Vercel preview deploy found"

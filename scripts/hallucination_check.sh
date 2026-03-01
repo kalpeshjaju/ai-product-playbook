@@ -172,7 +172,7 @@ if [ -f ".env.example" ]; then
   USED_ENVS=$(echo "$CHANGED_ALL" | while IFS= read -r f; do
     [ -z "$f" ] && continue
     [ ! -f "$f" ] && continue
-    # Skip test, spec, config, documentation, and CI workflow files — they reference env vars for test setup, plans, or CI-specific vars
+    # Skip test, spec, config, documentation, and CI workflow files — they reference env vars for test setup, plan snippets, or Actions env: blocks
     [[ "$f" == tests/* || "$f" == *.test.* || "$f" == *.spec.* || "$f" == *.md || "$f" == docs/* || "$f" == .github/* ]] && continue
     grep -ohE 'os\.environ\[["'"'"'][A-Z0-9_]+["'"'"']\]|os\.getenv\(["'"'"'][A-Z0-9_]+["'"'"']|environ\.get\(["'"'"'][A-Z0-9_]+["'"'"']' "$f" 2>/dev/null \
       | grep -oE '[A-Z0-9_]{3,}' || true

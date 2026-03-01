@@ -52,6 +52,7 @@ jobs:
         github.event.workflow_run.conclusion == 'success')
     env:
       API_URL: ${{ secrets.PRODUCTION_API_URL }}
+      API_INTERNAL_KEY: ${{ secrets.API_INTERNAL_KEY }}
     steps:
       - name: Check API health endpoint
         run: |
@@ -83,6 +84,26 @@ jobs:
             echo "API response body is valid (status: $(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status'))"))"
           else
             echo "Error: API responded but status is missing or 'error'"
+            exit 1
+          fi
+
+      - name: Business transaction — GET /api/costs
+        if: env.API_INTERNAL_KEY != ''
+        run: |
+          echo "Verifying authenticated API route: GET /api/costs"
+          STATUS=$(curl -s -o /tmp/costs.json -w '%{http_code}' \
+            "${API_URL}/api/costs" \
+            -H "x-api-key: ${API_INTERNAL_KEY}" \
+            --max-time 10)
+
+          if [ "$STATUS" = "200" ]; then
+            echo "Business transaction passed (HTTP 200)"
+            python3 -c "import sys,json; d=json.load(open('/tmp/costs.json')); assert 'totalCost' in d or isinstance(d, list), 'unexpected shape'" 2>/dev/null \
+              && echo "Response shape validated" \
+              || echo "Warning: response shape unexpected (non-blocking)"
+          else
+            echo "Error: GET /api/costs returned HTTP $STATUS (expected 200)"
+            cat /tmp/costs.json 2>/dev/null || true
             exit 1
           fi
 
