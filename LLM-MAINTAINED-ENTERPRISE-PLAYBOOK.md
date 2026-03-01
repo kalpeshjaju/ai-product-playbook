@@ -2,9 +2,22 @@
 
 > **The core thesis**: In an LLM-maintained codebase, documentation is the product and automation is the immune system. Code is a derivative artifact. If docs are wrong, code drifts into incoherence. If rules aren't enforced by tooling, they'll be ignored under pressure.
 
-> **The enforcement principle**: Every rule in this playbook is paired with its enforcement mechanism. A rule without enforcement is a suggestion. Suggestions don't survive contact with production.
+> **The enforcement principle**: Every rule in this playbook is paired with an enforcement mechanism and an implementation status. A rule without enforcement is a suggestion. Suggestions don't survive contact with production.
 
-### The Four Pillars of an AI Product
+### Mock Infra Scope (Current Repo)
+
+This repository is intentionally a bootstrap/mock-infra project. Some controls are fully active today, others are scaffolded as stubs, and others are planned for the production project.
+
+Status labels used throughout this document:
+
+```
+[IMPLEMENTED]  Enforced in this repo today (as of 2026-02-28)
+[STUB]         Script/workflow exists but currently warns or no-ops
+[PLANNED]      Design is documented but not yet wired in this repo
+[TARGET]       Required state for the production project
+```
+
+### The Five Pillars of an AI Product
 
 Every AI product has five distinct pillars. This playbook covers all five:
 
@@ -73,7 +86,7 @@ Every AI product has five distinct pillars. This playbook covers all five:
 8. [Ops Discipline](#8-ops-discipline)
 9. [LLM Eval Harness](#9-llm-eval-harness) — includes Golden Trace Testing, Eval Harness Reliability
 10. [The Non-Coder's Role](#10-the-non-coders-role) — includes Availability Protocol
-11. [CI/CD Pipeline](#11-cicd-pipeline) — includes Canonical Gate Matrix
+11. [CI/CD Pipeline](#11-cicd-pipeline) — includes Current-State Snapshot + Target Gate Matrix
 12. [Monitoring & Observability](#12-monitoring--observability) — includes LLM Cost Controls
 13. [Tiered Adoption Path](#13-tiered-adoption-path)
 14. [Master Checklists](#14-master-checklists)
@@ -110,7 +123,9 @@ The non-coder writes this. In plain English. No technical jargon.
 - What's the budget for infra? (this constrains architecture)
 ```
 
-**Enforcement**: CI blocks all PRs until `docs/PRODUCT.md` exists and is non-empty. CODEOWNERS assigns this file to the non-coder — LLMs cannot modify it without approval.
+**Enforcement [IMPLEMENTED/TARGET]**:
+- [IMPLEMENTED] `docs/PRODUCT.md` exists and CODEOWNERS assigns it to the non-coder.
+- [TARGET] CI hard-blocks PRs when Tier 1 required docs are missing/empty.
 
 ### 1B. Decision Authority Matrix
 
@@ -123,7 +138,9 @@ WHO DECIDES WHAT:
 └── AUTOMATED (no decision needed): Formatting, linting, type-checking, tests
 ```
 
-**Enforcement**: CODEOWNERS file maps file paths to decision authority. Protected branches require non-coder approval for deployment configs, CI pipelines, and business rule files.
+**Enforcement [IMPLEMENTED/TARGET]**:
+- [IMPLEMENTED] CODEOWNERS protects key business docs and workflow/deploy paths.
+- [TARGET] Expand ownership map to all authority-critical files (for example dependency manifests and decision-governed domains).
 
 ### 1C. The Canonical Source of Truth
 
@@ -148,10 +165,12 @@ docs/
 
 **Why this matters**: LLMs have no persistent memory across sessions. Without these files, every new session starts from zero. The docs ARE the memory.
 
-**Enforcement**: The LLM instruction file (CLAUDE.md) mandates reading CONSTRAINTS.md and active DECISIONS before every implementation (Tier 1). LEARNING_JOURNAL.md is added at Tier 2. CI validates only the docs required by the current tier:
+**Enforcement [IMPLEMENTED/TARGET]**:
+- [IMPLEMENTED] The LLM instruction file (`CLAUDE.md`) mandates reading constraints/decisions before implementation.
+- [TARGET] CI validates only the docs required by the current tier:
 
 ```
-Tier 1: CI checks PRODUCT.md, CONSTRAINTS.md, DECISIONS.md exist and are non-empty
+Tier 1: CI checks PRODUCT.md, CONSTRAINTS.md, DECISIONS.md, CLAUDE.md exist and are non-empty
 Tier 2: + ARCHITECTURE.md, DATA_MODEL.md, API_CONTRACTS.md, SECURITY.md, LEARNING_JOURNAL.md
 Tier 3: + THREAT_MODEL.md, SLOs.md, INCIDENTS.md
 ```
@@ -774,53 +793,44 @@ What works: turning each rule into a control.
 ### The Enforcement Stack
 
 ```
-ENFORCEMENT LAYER
+ENFORCEMENT LAYER (status for this bootstrap repo as of 2026-02-28)
 
 ├── PRE-COMMIT HOOKS (local, instant feedback)
-│   ├── File header check: every source file must have PURPOSE block
-│   ├── No `any` types: caught by tsc + eslint, but pre-commit is faster
-│   ├── No console.log: regex scan rejects debug statements
-│   ├── No secrets: gitleaks scans for API keys, passwords, tokens
-│   └── Commit message format: conventional commits enforced
+│   ├── Secrets scan via ggshield                              [IMPLEMENTED]
+│   ├── File-header checks                                     [PLANNED]
+│   ├── Commit-message format checks                           [PLANNED]
+│   └── "No console.log/no any" pre-commit shortcuts           [PLANNED]
 │
-├── CI GATES (remote, blocks merge — THE critical layer)
-│   ├── Type check (tsc --noEmit)                        → Catches phantom APIs
-│   ├── Lint (0 warnings, not just 0 errors)             → Catches style violations
-│   ├── Tests (100% pass, coverage threshold)             → Catches logic errors
-│   ├── Build (must succeed)                              → Catches import/config errors
-│   ├── Bundle size (threshold)                           → Catches bloat
-│   ├── File size check (fails files > threshold)         → Catches monolith files
-│   ├── Doc freshness (see script below)                  → Catches stale docs
-│   ├── Dependency audit (npm audit)                      → Catches vulnerabilities
-│   ├── SAST scan (semgrep)                               → Catches injection patterns
-│   ├── Secret scan (gitleaks)                            → Catches leaked credentials
-│   ├── PR template validation (all sections filled)      → Catches lazy PRs
-│   └── Contract sync (API docs match implementation)     → Catches doc drift
+├── CI GATES (remote)
+│   ├── Type check + lint + tests (Turbo pipeline)             [IMPLEMENTED]
+│   ├── Architecture limits check script                       [IMPLEMENTED]
+│   ├── Python lint (ruff)                                     [IMPLEMENTED]
+│   ├── Doc freshness check                                    [STUB: warning mode]
+│   ├── Hallucination check                                    [STUB: warning mode]
+│   ├── Secret scan                                             [STUB: advisory/continue-on-error]
+│   ├── Build gate in main CI                                  [PLANNED]
+│   ├── npm audit + semgrep + container scan                   [PLANNED]
+│   ├── PR template validation script                           [STUB]
+│   └── API contract sync script                                [STUB]
 │
-├── PR TEMPLATE (enforced by CI, not by honor system)
-│   ├── ## What Changed (required, min 20 chars)
-│   ├── ## Why (required, min 20 chars)
-│   ├── ## Decisions Made (required if DECISIONS.md changed)
-│   ├── ## Tests Added/Modified (required if src/ changed)
-│   └── ## Confidence (required: VERIFIED/HIGH/MEDIUM/LOW + reasoning)
+├── PR TEMPLATE
+│   ├── Template sections exist                                 [IMPLEMENTED]
+│   └── CI enforcement for section completeness                 [STUB]
 │
 ├── CODEOWNERS (who must approve what)
-│   ├── docs/PRODUCT.md          → non-coder only
-│   ├── docs/CONSTRAINTS.md      → non-coder only
-│   ├── .github/workflows/**     → non-coder approval required
-│   ├── scripts/deploy*          → non-coder approval required
-│   ├── package.json             → non-coder approval for new deps
-│   └── src/**                   → auto-approved if all CI gates pass
+│   ├── docs/PRODUCT.md, docs/CONSTRAINTS.md                   [IMPLEMENTED]
+│   ├── .github/workflows/**, scripts/deploy*                  [IMPLEMENTED]
+│   ├── package.json non-coder ownership                        [PLANNED]
+│   └── Expanded business-rule path coverage                    [PLANNED]
 │
 └── PROTECTED BRANCHES / ENVIRONMENTS
-    ├── main: requires CI pass + PR approval
-    ├── staging: auto-deploy on PR merge (non-coder can test)
-    └── production: requires non-coder manual approval
+    ├── Branch/env protections configured in GitHub             [TARGET]
+    └── Production manual approval with non-coder gate          [TARGET]
 ```
 
 ### Doc Freshness Enforcement Script
 
-This is the script that turns "please update docs" into "CI fails if you don't."
+Reference implementation for blocking doc-freshness mode. In this bootstrap repo, the active script currently runs in warning mode ([STUB]) while project setup is in progress.
 
 ```bash
 #!/bin/bash
@@ -1080,7 +1090,7 @@ echo "✅ All files within size limit"
 
 ### Mapping Rules to Controls
 
-Every rule in this playbook that CAN be automated MUST be:
+Target mapping (production-state): every rule in this playbook that CAN be automated MUST be:
 
 ```
 RULE                              ENFORCEMENT MECHANISM           TYPE
@@ -1112,6 +1122,8 @@ Error messages have context       Code review
 Functions under 120 lines         Code review (could be CI but noisy)
 Visual smoke test before prod     Manual click-through checklist
 ```
+
+Use Section 11's **Current-State Gate Snapshot** for what is actually active in this bootstrap repo today.
 
 ---
 
@@ -2285,7 +2297,9 @@ rules:
 
 ### Example Minimal Pipeline (Tier 1)
 
-This is a Tier 1 starting pipeline. **The Canonical Gate Matrix below is the single source of truth** for which gates are required at each tier. As you progress through tiers, add gates from the matrix.
+This is a Tier 1 starting pipeline. In this bootstrap repo, enforcement is staged. Use the two matrices below:
+- **Current-State Gate Snapshot** = what is actually enforced in this repo today.
+- **Target Gate Matrix** = what must be enforced for the production project.
 
 ```yaml
 # Tier 1 pipeline (Day 1 — 5 gates):
@@ -2301,16 +2315,34 @@ pipeline:
   # STAGE 3: Build (2-5 minutes)
   5_build:            next build  # or equivalent
 
-  # See Canonical Gate Matrix for Tier 2+ gates to add.
+  # See Target Gate Matrix for Tier 2+ gates to add.
   # ALL enabled gates must pass before merge.
   # No --no-verify. No skip flags. If a gate fails, fix the root cause.
 ```
 
-**Enforcement**: Branch protection rules require all enabled checks to pass. No admin bypass for production branches. Add gates from the Canonical Gate Matrix as you advance tiers.
+**Enforcement [TARGET]**: Branch protection rules require all enabled checks to pass. No admin bypass for production branches. Add gates from the Target Gate Matrix as you advance tiers.
 
-### Canonical Gate Matrix (Single Source of Truth)
+### Current-State Gate Snapshot (Implemented in This Repo)
 
-This is the authoritative list. If a gate is claimed elsewhere in this document but missing from this matrix, it doesn't exist.
+As of **2026-02-28**, this is what runs now:
+
+```
+GATE                     COMMAND / SCRIPT                             STATUS
+──────────────────────── ──────────────────────────────────────────── ─────────────────────────────
+type_check               npx turbo run type-check                     [IMPLEMENTED][BLOCKING]
+lint                     npx turbo run lint                           [IMPLEMENTED][BLOCKING]
+unit_tests               npx turbo run test                           [IMPLEMENTED][BLOCKING]
+architecture_limits      python scripts/check_architecture_limits.py  [IMPLEMENTED][BLOCKING]
+python_lint              ruff check packages/ apps/                   [IMPLEMENTED][BLOCKING]
+doc_freshness            scripts/check_doc_freshness.sh               [STUB][WARNING ONLY]
+hallucination_check      scripts/hallucination_check.sh               [STUB][WARNING ONLY]
+secret_scan              ggshield GitHub Action                        [STUB][ADVISORY]
+llm_golden_traces        promptfoo-action workflow (path-triggered)   [IMPLEMENTED][CONDITIONAL]
+```
+
+### Target Gate Matrix (Single Source of Truth for Production Project)
+
+This is the authoritative end-state list. If a gate is claimed elsewhere in this document but missing from this matrix, it doesn't exist in the target system.
 
 ```
 GATE                     COMMAND / SCRIPT                      TIER   BLOCKING
@@ -2421,7 +2453,9 @@ RELEASE SAFETY LANE:
 1. GIT-BASED DEPLOY ONLY                    [HARD GATE]
    Production deploys trigger from git push to main, not from CLI commands
    that snapshot your local working directory.
-   ❌ `railway up`, `vercel --prod` (deploys whatever's in cwd — may be wrong project)
+   ❌ Local workstation `railway up`, `vercel --prod` from arbitrary cwd
+      (snapshot risk: wrong project or uncommitted state)
+   ✅ CI-run deploy commands from checked-out git SHA are acceptable
    ✅ Push to main → platform auto-deploys from committed code
 
 2. PRE-RELEASE GUARD (before merge to main)  [HARD GATE]
@@ -2553,7 +2587,7 @@ DOCS (add when you have something to deploy):
 └── LEARNING_JOURNAL.md — Start logging what fails
 
 AUTOMATION (add when deploying):
-├── All Tier ≤2 gates from Canonical Gate Matrix (currently 16 blocking gates)
+├── Move Tier ≤2 gates from Target Matrix into Current-State enforcement
 ├── Protected branches (require PR + CI pass)
 ├── Staging environment (auto-deploy on merge)
 ├── Production environment (require non-coder approval)
@@ -5912,7 +5946,7 @@ RAG evaluation             RAGAS                        DeepEval                
 
 ## Appendix B: Industry Context (February 2026)
 
-This playbook exists in a rapidly maturing market. The data below is from the deep research validation performed on February 28, 2026. Full details: `docs/PLAYBOOK-VALIDATION-REPORT.md`.
+This playbook exists in a rapidly maturing market. The data below is from validation research performed on February 28, 2026. Bootstrap validation notes live in `docs/PLAYBOOK-VALIDATION-REPORT.md`.
 
 ### Enterprise Case Studies
 
@@ -5992,7 +6026,7 @@ Five significant shifts in the AI tooling landscape since the playbook's last ma
 2. **Learning Journal as persistent memory** — No tool maintains a cross-session anti-pattern registry that LLMs read before implementation.
 3. **Non-coder governance framework** — No product category exists for non-technical stakeholders to manage quality, track risk, and make informed decisions about AI-built products.
 4. **Conflict Resolution Order** — No tool enforces a hierarchy of truth when docs contradict each other.
-5. **Integrated playbook** — No single tool or platform covers all 19 sections.
+5. **Integrated playbook** — No single tool or platform covers all 22 sections.
 6. **Single-source-of-truth instruction files** — CLAUDE.md as master, .cursorrules/AGENTS.md as pointers. No tool enforces this pattern (Section 2).
 7. **LLM review conflict resolution** — When maker and checker disagree, no tool arbitrates. Process defined in Section 2.
 8. **Session handoff protocol** — No tool captures "where I left off" for the next LLM. Handoff format defined in Section 2.
@@ -6010,7 +6044,7 @@ The playbook's approach — docs as memory, automation as enforcement, layered d
 
 ## Appendix C: Validation Report Summary
 
-Full report: `docs/PLAYBOOK-VALIDATION-REPORT.md`
+Validation report (bootstrap baseline): `docs/PLAYBOOK-VALIDATION-REPORT.md`
 
 ### Playbook vs. Industry Alignment
 
@@ -6048,11 +6082,11 @@ Stripe Layer                    Playbook Section
 
 ## Appendix D: Rule Classification
 
-Every rule in this playbook is classified by enforcement type. This is a derived classification — the **Canonical Gate Matrix (Section 11) remains the single source of truth** for CI pipeline gates. Rules listed here that are not individual gates in the matrix are sub-checks within listed gates (e.g., "Prompt injection" is a semgrep sub-rule enforced within the `sast` gate) or operational rules enforced outside the PR pipeline (e.g., error budget freeze).
+Every rule in this playbook is classified by enforcement type. This is a derived classification — the **Target Gate Matrix (Section 11) remains the single source of truth** for production CI pipeline gates. Rules listed here that are not individual gates in the matrix are sub-checks within listed gates (e.g., "Prompt injection" is a semgrep sub-rule enforced within the `sast` gate) or operational rules enforced outside the PR pipeline (e.g., error budget freeze). For the bootstrap repo's live status, use the **Current-State Gate Snapshot** in Section 11.
 
-### [HARD GATE] — CI blocks merge
+### [HARD GATE][TARGET] — CI blocks merge in production setup
 
-These rules are enforced by automation. PRs cannot merge if they fail.
+These rules are the target automation set. PRs cannot merge if they fail once each gate is implemented and enabled.
 
 ```
 RULE                                           GATE / TOOL                        TIER
@@ -6207,9 +6241,10 @@ Prioritization strategy for timeout truncation Agent file header + ARCHITECTURE.
 
 ---
 
-**Version**: 6.4.0
-**Status**: Final
-**Incorporates**: v6.3.0 + moat stack expansion (8 new tool categories, 12 new Appendix A entries). New sections: LLM Output Guardrails (Section 7), Structured Output + Intelligent Routing + Semantic Caching tool rosters (Section 18), Eval & Optimization Tool Roster (Section 9), Agent Memory & State Management + Fine-Tuning Pipeline + Automated Prompt Optimization (Section 20), Moat Acceleration Tools (Section 22), AI Tooling Landscape Shifts (Appendix B). MOAT-STACK-SETUP.md expanded from 5 to 15 tools across 3 priority tiers.
+**Version**: 6.5.0
+**Status**: Bootstrap (mock-infra, staged enforcement)
+**Incorporates**: v6.4.0 + explicit status model (`[IMPLEMENTED]/[STUB]/[PLANNED]/[TARGET]`), mock-infra scope clarification, Section 11 split into current-state vs target gate matrices, and validation report grounding for this repo phase.
+**Previous**: v6.4.0 — v6.3.0 + moat stack expansion (8 new tool categories, 12 new Appendix A entries). New sections: LLM Output Guardrails (Section 7), Structured Output + Intelligent Routing + Semantic Caching tool rosters (Section 18), Eval & Optimization Tool Roster (Section 9), Agent Memory & State Management + Fine-Tuning Pipeline + Automated Prompt Optimization (Section 20), Moat Acceleration Tools (Section 22), AI Tooling Landscape Shifts (Appendix B). MOAT-STACK-SETUP.md expanded from 5 to 15 tools across 3 priority tiers.
 **Previous**: v6.3.0 — v6.2.0 + 4 expanded patterns from cross-project feedback review: monthly chaos test with full implementation (Section 9), prompt injection PR attack vectors with safe review pipeline (Section 7), doc freshness hallucination chain + graduated enforcement + playbook.config.yaml (Section 5), streaming-first ESLint rule config + TTFT SLO + exemption pattern (Section 16). 1 new Appendix D entry (chaos test catch rate).
 **Previous**: v6.2.0 — v6.1.0 + 7 LLM resilience patterns from production (ui-ux-audit-tool + job-matchmaker): multi-strategy JSON extraction (Section 18), data falsification prevention with `||` (Section 18), fallback rate monitoring (Section 18), prioritized processing under timeout (Section 18), timeout alignment across layers (Section 18), over-mocking tests detection (Section 17), dual-layer cost tracking at provider + agent levels (Section 18). 5 new entries in "What No Tool Solves" (items 11-15, Appendix B). 9 new rule classifications in Appendix D.
-**Validation**: See `docs/PLAYBOOK-VALIDATION-REPORT.md` for full section-by-section validation with sources
+**Validation**: See `docs/PLAYBOOK-VALIDATION-REPORT.md` for current bootstrap validation status and next milestones
