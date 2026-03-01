@@ -3,12 +3,19 @@ import Link from 'next/link';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { PostHogProvider } from '../providers/posthog-provider';
 import { ClerkProviderShell } from '../providers/clerk-provider-shell';
+import { NavLink } from '../components/nav-link';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'AI Product Playbook',
   description: 'LLM-Maintained Enterprise Playbook',
 };
+
+const NAV_ITEMS = [
+  { href: '/', label: 'Home', exact: true },
+  { href: '/prompts', label: 'Prompts' },
+  { href: '/costs', label: 'Costs' },
+];
 
 const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
@@ -20,15 +27,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="text-lg font-semibold text-gray-900">
             Playbook
           </Link>
-          <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
-            Home
-          </Link>
-          <Link href="/prompts" className="text-sm text-gray-600 hover:text-gray-900">
-            Prompts
-          </Link>
-          <Link href="/costs" className="text-sm text-gray-600 hover:text-gray-900">
-            Costs
-          </Link>
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.href}
+              href={item.href}
+              exact={item.exact}
+              className="text-sm text-gray-600 hover:text-gray-900"
+              activeClassName="font-medium text-gray-900"
+            >
+              {item.label}
+            </NavLink>
+          ))}
           {clerkEnabled && (
             <div className="ml-auto flex items-center gap-3">
               <SignedOut>

@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
 import { PostHogProvider } from '../providers/posthog-provider';
 import { ClerkProviderShell } from '../providers/clerk-provider-shell';
+import { NavLink } from '../components/nav-link';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Users' },
+  { href: '/', label: 'Users', exact: true },
   { href: '/prompts', label: 'Prompts' },
   { href: '/costs', label: 'Costs' },
   { href: '/memory', label: 'Memory' },
@@ -33,13 +33,15 @@ function AdminSidebar() {
       </div>
       <nav className="mt-2 space-y-1 px-3">
         {NAV_ITEMS.map((item) => (
-          <Link
+          <NavLink
             key={item.href}
             href={item.href}
+            exact={item.exact}
             className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+            activeClassName="bg-gray-100 font-medium text-gray-900"
           >
             {item.label}
-          </Link>
+          </NavLink>
         ))}
       </nav>
     </aside>

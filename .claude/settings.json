@@ -1,12 +1,27 @@
 {
   "hooks": {
-    "postToolUse": [
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/kalpeshjaju/Development/ai-product-playbook/.claude/hooks/protect-sensitive-files.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "cd /Users/kalpeshjaju/Development/ai-product-playbook && npx tsc --noEmit 2>&1 | head -20 || true"
+          },
+          {
+            "type": "command",
+            "command": "/Users/kalpeshjaju/Development/ai-product-playbook/.claude/hooks/eslint-fix.sh"
           }
         ]
       }

@@ -65,6 +65,8 @@ Turborepo monorepo. All apps share `@playbook/shared-types` and `@playbook/share
 
 **admin**: `/` (Users) | `/prompts` (Prompts) | `/costs` (Costs) | `/memory` (Memory)
 
+**web**: `/` (Home) | `/prompts` (Prompts) | `/costs` (Costs)
+
 ### Key file locations per app
 
 ```
