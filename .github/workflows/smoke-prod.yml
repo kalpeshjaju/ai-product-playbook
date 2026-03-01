@@ -1,0 +1,183 @@
+##
+# FILE PURPOSE: Production smoke tests after deploys
+#
+# WHY: Validates that production services are actually reachable after deploy.
+#      Catches DNS, routing, and startup failures within minutes of deploy.
+# HOW: Triggered automatically after deploy workflows complete, or manually
+#      via workflow_dispatch with a target selector (all/api/web/admin).
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-03-01
+##
+
+name: Production Smoke Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which service to smoke test'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api
+          - web
+          - admin
+
+  workflow_run:
+    workflows:
+      - 'Deploy API'
+      - 'Deploy Web'
+      - 'Deploy Admin'
+    types:
+      - completed
+    branches: [main]
+
+concurrency:
+  group: smoke-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-api:
+    name: Smoke Test — API
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.target == 'all' || github.event.inputs.target == 'api')) ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.name == 'Deploy API' &&
+        github.event.workflow_run.conclusion == 'success')
+    env:
+      API_URL: ${{ secrets.PRODUCTION_API_URL }}
+    steps:
+      - name: Check API health endpoint
+        run: |
+          echo "Checking API health at ${API_URL}/api/health"
+
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+              "${API_URL}/api/health" \
+              --max-time 10) || true
+
+            if [ "$STATUS" = "200" ]; then
+              echo "API is healthy (attempt $i)"
+              exit 0
+            fi
+
+            echo "Attempt $i: got HTTP $STATUS, retrying in 15s..."
+            sleep 15
+          done
+
+          echo "API health check failed after 5 attempts"
+          exit 1
+
+      - name: Verify API response body
+        run: |
+          BODY=$(curl -s "${API_URL}/api/health" --max-time 10)
+          echo "Response: $BODY"
+
+          if echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status') == 'ok'" 2>/dev/null; then
+            echo "API response body is valid"
+          else
+            echo "Error: API responded but body does not contain expected status field"
+            exit 1
+          fi
+
+  smoke-web:
+    name: Smoke Test — Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.target == 'all' || github.event.inputs.target == 'web')) ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.name == 'Deploy Web' &&
+        github.event.workflow_run.conclusion == 'success')
+    env:
+      WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
+    steps:
+      - name: Check web app loads
+        run: |
+          echo "Checking web app at ${WEB_URL}"
+
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+              "${WEB_URL}" \
+              --max-time 15 -L) || true
+
+            if [ "$STATUS" = "200" ]; then
+              echo "Web app is reachable (attempt $i)"
+              exit 0
+            fi
+
+            echo "Attempt $i: got HTTP $STATUS, retrying in 15s..."
+            sleep 15
+          done
+
+          echo "Web app health check failed after 5 attempts"
+          exit 1
+
+      - name: Verify web app serves HTML
+        run: |
+          CONTENT_TYPE=$(curl -s -o /dev/null -w '%{content_type}' \
+            "${WEB_URL}" \
+            --max-time 15 -L)
+          echo "Content-Type: $CONTENT_TYPE"
+
+          if echo "$CONTENT_TYPE" | grep -q "text/html"; then
+            echo "Web app is serving HTML content"
+          else
+            echo "Warning: unexpected content type from web app"
+            exit 1
+          fi
+
+  smoke-admin:
+    name: Smoke Test — Admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.target == 'all' || github.event.inputs.target == 'admin')) ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.name == 'Deploy Admin' &&
+        github.event.workflow_run.conclusion == 'success')
+    env:
+      ADMIN_URL: ${{ secrets.PRODUCTION_ADMIN_URL }}
+    steps:
+      - name: Check admin app loads
+        run: |
+          echo "Checking admin app at ${ADMIN_URL}"
+
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+              "${ADMIN_URL}" \
+              --max-time 15 -L) || true
+
+            if [ "$STATUS" = "200" ]; then
+              echo "Admin app is reachable (attempt $i)"
+              exit 0
+            fi
+
+            echo "Attempt $i: got HTTP $STATUS, retrying in 15s..."
+            sleep 15
+          done
+
+          echo "Admin app health check failed after 5 attempts"
+          exit 1
+
+      - name: Verify admin app serves HTML
+        run: |
+          CONTENT_TYPE=$(curl -s -o /dev/null -w '%{content_type}' \
+            "${ADMIN_URL}" \
+            --max-time 15 -L)
+          echo "Content-Type: $CONTENT_TYPE"
+
+          if echo "$CONTENT_TYPE" | grep -q "text/html"; then
+            echo "Admin app is serving HTML content"
+          else
+            echo "Warning: unexpected content type from admin app"
+            exit 1
+          fi
