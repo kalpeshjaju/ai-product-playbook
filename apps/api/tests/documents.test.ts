@@ -220,7 +220,7 @@ describe('handleDocumentRoutes', () => {
     );
     expect(res._statusCode).toBe(201);
     const body = JSON.parse(res._body) as Record<string, unknown>;
-    expect(body.document).toBeDefined();
+    expect(body.documentId).toBeDefined();
   });
 
   it('POST /api/documents returns existing doc when content hash matches (dedup)', async () => {
@@ -245,7 +245,7 @@ describe('handleDocumentRoutes', () => {
     expect(res._statusCode).toBe(200);
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.duplicate).toBe(true);
-    expect(body.document).toBeDefined();
+    expect(body.documentId).toBeDefined();
   });
 
   // ── POST /api/documents/upload ───────────────────────────────────────────

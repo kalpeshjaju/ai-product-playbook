@@ -301,7 +301,7 @@ describe('Document Ingestion (Postgres)', () => {
     });
     // 201 if new, 200 if duplicate
     expect([200, 201]).toContain(status);
-    expect(body.document).toBeTruthy();
+    expect(body.documentId ?? body.document).toBeTruthy();
   });
 
   it('lists documents', async () => {
@@ -324,6 +324,70 @@ describe('Document Ingestion (Postgres)', () => {
     );
     expect(status).toBe(400);
     expect(body.error).toContain('Unsupported Content-Type');
+  });
+});
+
+// ─── Ingest Persistence ────────────────────────────────────────
+
+describe('Ingest Persistence (Postgres)', () => {
+  const uniqueContent = `E2E ingest test content ${Date.now()} — persistence pipeline validates dedup, chunking, and DB storage.`;
+
+  it('ingest persists document to DB (201 or 207)', async () => {
+    const res = await fetch(`${API_URL}/api/ingest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+        'x-api-key': TEST_API_KEY,
+        'x-admin-key': TEST_ADMIN_KEY,
+        'x-document-title': 'E2E Ingest Test',
+      },
+      body: uniqueContent,
+    });
+    const body = await res.json() as Record<string, unknown>;
+    // 201 (full success) or 207 (doc stored, embeddings failed — no LiteLLM in CI)
+    expect([201, 207]).toContain(res.status);
+    expect(body.documentId).toBeTypeOf('string');
+    expect(body.persisted).toBe(true);
+    expect(body.duplicate).toBe(false);
+    expect(body.contentHash).toBeTypeOf('string');
+  });
+
+  it('ingest dedup returns 200 for same content', async () => {
+    const res = await fetch(`${API_URL}/api/ingest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+        'x-api-key': TEST_API_KEY,
+        'x-admin-key': TEST_ADMIN_KEY,
+      },
+      body: uniqueContent,
+    });
+    const body = await res.json() as Record<string, unknown>;
+    expect(res.status).toBe(200);
+    expect(body.duplicate).toBe(true);
+    expect(body.documentId).toBeTypeOf('string');
+  });
+
+  it('ingest unsupported type returns 422', async () => {
+    const res = await fetch(`${API_URL}/api/ingest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-unsupported-type',
+        'x-api-key': TEST_API_KEY,
+        'x-admin-key': TEST_ADMIN_KEY,
+      },
+      body: Buffer.from('some binary data'),
+    });
+    const body = await res.json() as Record<string, unknown>;
+    expect(res.status).toBe(422);
+    expect(body.error).toContain('Unsupported');
+  });
+
+  it('GET /api/ingest/types returns supported types', async () => {
+    const { status, body } = await get('/api/ingest/types');
+    expect(status).toBe(200);
+    expect(Array.isArray(body.supportedTypes)).toBe(true);
+    expect((body.supportedTypes as string[]).length).toBeGreaterThan(0);
   });
 });
 

@@ -55,6 +55,7 @@ const ROUTE_RULES: RouteRule[] = [
   { prefix: '/api/few-shot', methods: ['DELETE'], tier: 'admin' },
   { prefix: '/api/prompts', methods: ['POST'], tier: 'admin' },
   { prefix: '/api/prompts', methods: ['PATCH'], tier: 'admin' },
+  { prefix: '/api/ingest', methods: ['POST'], tier: 'admin' },
 ];
 
 /** Determine the required auth tier for a given URL + method. */
@@ -79,10 +80,24 @@ export function getRequiredTier(url: string, method: string): AuthTier {
 
 type AuthMode = 'strict' | 'open';
 
-/** Get the configured auth mode. Defaults to 'strict' in production. */
+/**
+ * Get the configured auth mode.
+ * In production: refuses AUTH_MODE=open unless break-glass AUTH_ALLOW_OPEN_IN_PRODUCTION=true is set.
+ * Falls back to strict (log-and-refuse, not crash).
+ */
 export function getAuthMode(): AuthMode {
   const mode = process.env.AUTH_MODE?.toLowerCase();
-  if (mode === 'open') return 'open';
+  if (mode === 'open') {
+    if (process.env.NODE_ENV === 'production') {
+      if (process.env.AUTH_ALLOW_OPEN_IN_PRODUCTION === 'true') {
+        process.stdout.write('WARN: AUTH_MODE=open in production (break-glass override active)\n');
+        return 'open';
+      }
+      process.stdout.write('WARN: AUTH_MODE=open rejected in production — falling back to strict\n');
+      return 'strict';
+    }
+    return 'open';
+  }
   return 'strict';
 }
 
@@ -177,7 +192,10 @@ function extractBearerToken(req: IncomingMessage): string | null {
 export function validateAuthConfig(): void {
   const mode = getAuthMode();
   if (mode === 'open') {
-    process.stdout.write('WARN: AUTH_MODE=open — authentication disabled (dev mode only)\n');
+    process.stdout.write('WARN: AUTH_MODE=open — user authentication disabled (dev mode only)\n');
+    if (!process.env.ADMIN_API_KEY) {
+      process.stdout.write('WARN: ADMIN_API_KEY not set — all admin routes will reject requests (403) even in open mode\n');
+    }
     return;
   }
 
@@ -275,8 +293,18 @@ export async function authenticateRequest(
     return { userContext, tier, authMethod: 'api-key' };
   }
 
-  // AUTH_MODE=open: explicit dev opt-in to skip auth
+  // AUTH_MODE=open: explicit dev opt-in to skip user auth.
+  // Admin routes still require valid x-admin-key — open mode relaxes user auth, not admin auth.
   if (getAuthMode() === 'open') {
+    if (tier === 'admin') {
+      if (!isValidAdminKey(req)) {
+        res.statusCode = 403;
+        res.end(JSON.stringify({
+          error: 'Forbidden: admin access required (x-admin-key) — AUTH_MODE=open does not bypass admin auth',
+        }));
+        return null;
+      }
+    }
     const userContext = createUserContext(req);
     return { userContext, tier, authMethod: 'none' };
   }

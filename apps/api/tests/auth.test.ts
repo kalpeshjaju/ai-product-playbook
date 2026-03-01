@@ -16,7 +16,9 @@ vi.mock('@playbook/shared-llm', () => ({
 
 import {
   getRequiredTier,
+  getAuthMode,
   authenticateRequest,
+  validateAuthConfig,
   verifyUserOwnership,
   clearApiKeyCache,
 } from '../src/middleware/auth.js';
@@ -128,6 +130,10 @@ describe('getRequiredTier', () => {
 
   it('returns user for POST /api/memory', () => {
     expect(getRequiredTier('/api/memory', 'POST')).toBe('user');
+  });
+
+  it('returns admin for POST /api/ingest', () => {
+    expect(getRequiredTier('/api/ingest', 'POST')).toBe('admin');
   });
 });
 
@@ -261,6 +267,162 @@ describe('authenticateRequest', () => {
     const result = await authenticateRequest(req, res, '/api/costs/reset');
     expect(result).toBeNull();
     expect(res._statusCode).toBe(403);
+  });
+});
+
+// ─── getAuthMode ───
+
+describe('getAuthMode', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns strict by default', () => {
+    vi.stubEnv('AUTH_MODE', '');
+    expect(getAuthMode()).toBe('strict');
+  });
+
+  it('returns open when AUTH_MODE=open and not production', () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('NODE_ENV', 'test');
+    expect(getAuthMode()).toBe('open');
+  });
+
+  it('returns strict when AUTH_MODE=open in production (no break-glass)', () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('NODE_ENV', 'production');
+    delete process.env.AUTH_ALLOW_OPEN_IN_PRODUCTION;
+    expect(getAuthMode()).toBe('strict');
+  });
+
+  it('returns open when AUTH_MODE=open in production with break-glass', () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('AUTH_ALLOW_OPEN_IN_PRODUCTION', 'true');
+    expect(getAuthMode()).toBe('open');
+  });
+});
+
+// ─── Auth hardening: open mode + admin routes ───
+
+describe('Auth hardening: open mode + admin enforcement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearApiKeyCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    clearApiKeyCache();
+  });
+
+  it('open mode + admin route + no admin key → 403', async () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('ADMIN_API_KEY', 'admin-secret');
+    vi.stubEnv('API_KEYS', '');
+    clearApiKeyCache();
+    const req = createMockReq('POST', {});
+    const res = createMockRes();
+    const result = await authenticateRequest(req, res, '/api/costs/reset');
+    expect(result).toBeNull();
+    expect(res._statusCode).toBe(403);
+    expect(res._body).toContain('admin access required');
+  });
+
+  it('open mode + admin route + valid admin key → pass', async () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('ADMIN_API_KEY', 'admin-secret');
+    vi.stubEnv('API_KEYS', '');
+    clearApiKeyCache();
+    const req = createMockReq('POST', { 'x-admin-key': 'admin-secret' });
+    const res = createMockRes();
+    const result = await authenticateRequest(req, res, '/api/costs/reset');
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('admin');
+    expect(result!.authMethod).toBe('none');
+  });
+
+  it('production + AUTH_MODE=open → falls back to strict (401 without creds)', async () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('API_KEYS', 'key-1');
+    delete process.env.AUTH_ALLOW_OPEN_IN_PRODUCTION;
+    clearApiKeyCache();
+    const req = createMockReq('GET', {});
+    const res = createMockRes();
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
+    expect(result).toBeNull();
+    expect(res._statusCode).toBe(401);
+  });
+
+  it('production + AUTH_MODE=open + break-glass → open mode active', async () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('AUTH_ALLOW_OPEN_IN_PRODUCTION', 'true');
+    vi.stubEnv('ADMIN_API_KEY', 'admin-secret');
+    vi.stubEnv('API_KEYS', '');
+    clearApiKeyCache();
+    const req = createMockReq('GET', {});
+    const res = createMockRes();
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
+    expect(result).not.toBeNull();
+    expect(result!.authMethod).toBe('none');
+  });
+
+  it('open mode + user route → passes without auth', async () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('API_KEYS', '');
+    clearApiKeyCache();
+    const req = createMockReq('GET', {});
+    const res = createMockRes();
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('user');
+    expect(result!.authMethod).toBe('none');
+  });
+
+  it('POST /api/ingest requires admin tier', () => {
+    expect(getRequiredTier('/api/ingest', 'POST')).toBe('admin');
+  });
+
+  it('GET /api/ingest/types requires user tier (default)', () => {
+    expect(getRequiredTier('/api/ingest/types', 'GET')).toBe('user');
+  });
+});
+
+// ─── validateAuthConfig ───
+
+describe('validateAuthConfig', () => {
+  beforeEach(() => {
+    clearApiKeyCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    clearApiKeyCache();
+  });
+
+  it('throws in strict mode with no auth providers', () => {
+    vi.stubEnv('AUTH_MODE', 'strict');
+    vi.stubEnv('API_KEYS', '');
+    vi.stubEnv('API_INTERNAL_KEY', '');
+    delete process.env.CLERK_SECRET_KEY;
+    clearApiKeyCache();
+    expect(() => validateAuthConfig()).toThrow('no auth providers configured');
+  });
+
+  it('passes in strict mode with API_KEYS set', () => {
+    vi.stubEnv('AUTH_MODE', 'strict');
+    vi.stubEnv('API_KEYS', 'key-1');
+    clearApiKeyCache();
+    expect(() => validateAuthConfig()).not.toThrow();
+  });
+
+  it('passes in open mode without throwing', () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('API_KEYS', '');
+    clearApiKeyCache();
+    expect(() => validateAuthConfig()).not.toThrow();
   });
 });
 

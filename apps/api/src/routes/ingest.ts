@@ -1,9 +1,10 @@
 /**
  * FILE PURPOSE: Unified ingestion API route — accepts any supported MIME type
  * WHY: §19 — single entry point for all input modalities. Dispatches via IngesterRegistry.
+ *      Now persists parsed content to DB via DocumentPersistenceService.
  *
  * Routes:
- *   POST /api/ingest — ingest content of any supported type
+ *   POST /api/ingest — ingest content of any supported type (persists to DB)
  *   GET  /api/ingest/types — list supported MIME types
  */
 
@@ -17,6 +18,7 @@ import {
   CsvIngester,
   ApiFeedIngester,
 } from '@playbook/shared-llm';
+import { persistDocument } from '../services/document-persistence.js';
 
 const registry = new IngesterRegistry();
 registry.register(new DocumentIngester());
@@ -65,8 +67,9 @@ export async function handleIngestRoutes(
         return;
       }
 
-      const result = await registry.ingest(rawBody, contentType);
-      if (!result) {
+      // Parse via IngesterRegistry
+      const ingestResult = await registry.ingest(rawBody, contentType);
+      if (!ingestResult) {
         res.statusCode = 422;
         res.end(JSON.stringify({
           error: `Unsupported or failed ingestion for Content-Type: ${contentType}`,
@@ -75,14 +78,42 @@ export async function handleIngestRoutes(
         return;
       }
 
-      res.statusCode = 201;
+      // Persist parsed content to DB via DocumentPersistenceService
+      const title = typeof req.headers['x-document-title'] === 'string'
+        ? req.headers['x-document-title']
+        : `Ingested ${ingestResult.sourceType}`;
+
+      const persistResult = await persistDocument({
+        title,
+        content: ingestResult.text,
+        mimeType: ingestResult.mimeType,
+        sourceType: ingestResult.sourceType,
+        metadata: ingestResult.metadata
+          ? { ...ingestResult.metadata, ingestContentHash: ingestResult.contentHash }
+          : { ingestContentHash: ingestResult.contentHash },
+      });
+
+      if (persistResult.duplicate) {
+        res.statusCode = 200;
+        res.end(JSON.stringify({
+          documentId: persistResult.documentId,
+          persisted: false,
+          duplicate: true,
+          contentHash: persistResult.contentHash,
+        }));
+        return;
+      }
+
+      // 207 if doc stored but embeddings failed; 201 for full success
+      res.statusCode = persistResult.partialFailure ? 207 : 201;
       res.end(JSON.stringify({
-        text: result.text.slice(0, 500) + (result.text.length > 500 ? '...' : ''),
-        sourceType: result.sourceType,
-        mimeType: result.mimeType,
-        contentHash: result.contentHash,
-        metadata: result.metadata,
-        textLength: result.text.length,
+        documentId: persistResult.documentId,
+        persisted: persistResult.persisted,
+        duplicate: false,
+        chunksCreated: persistResult.chunksCreated,
+        embeddingsGenerated: persistResult.embeddingsGenerated,
+        embeddingModelId: persistResult.embeddingModelId,
+        contentHash: persistResult.contentHash,
       }));
       return;
     }
