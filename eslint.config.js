@@ -6,11 +6,12 @@
  *      Covers all packages/ and apps/ in the monorepo.
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-02-28
+ * LAST UPDATED: 2026-03-01
  */
 
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import nextPlugin from '@next/eslint-plugin-next';
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -29,6 +30,16 @@ export default tseslint.config(
 
       // No console.log in production code
       'no-console': 'error',
+    },
+  },
+  {
+    files: ['apps/web/**/*.{ts,tsx}', 'apps/admin/**/*.{ts,tsx}'],
+    plugins: {
+      '@next/next': nextPlugin,
+    },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
     },
   },
   {

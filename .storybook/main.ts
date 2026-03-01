@@ -12,6 +12,7 @@ import type { StorybookConfig } from '@storybook/nextjs';
 
 const config: StorybookConfig = {
   stories: [
+    '../packages/shared-ui/src/**/*.stories.@(ts|tsx)',
     '../apps/admin/src/**/*.stories.@(ts|tsx)',
     '../apps/web/src/**/*.stories.@(ts|tsx)',
   ],
