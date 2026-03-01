@@ -5,3 +5,4 @@ export { chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, selectCh
 export { DocumentIngester } from './adapters/document.js';
 export { AudioIngester } from './adapters/audio.js';
 export { ImageIngester } from './adapters/image.js';
+export { WebIngester } from './adapters/web.js';
