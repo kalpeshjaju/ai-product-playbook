@@ -1,0 +1,139 @@
+##
+# FILE PURPOSE: Detect and track --admin merge bypasses
+#
+# WHY: When PRs are merged with `--admin` (bypassing branch protection),
+#      required CI checks may not have passed. This creates risk.
+#      This workflow detects bypasses, captures a feedback event, and
+#      opens a GitHub issue for post-merge verification.
+# HOW: Triggers on PR close (merged). Checks if any required checks
+#      were pending/failed at merge time. If so → feedback + issue.
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-03-02
+##
+
+name: Admin Bypass Tracker
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  detect-bypass:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for bypassed CI checks
+        id: bypass
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.pull_request.merge_commit_sha
+              || context.payload.pull_request.head.sha;
+
+            const { data: checkRuns } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+              per_page: 100,
+            });
+
+            const failed = checkRuns.check_runs.filter(c =>
+              c.conclusion === 'failure' || c.conclusion === 'cancelled'
+            );
+            const pending = checkRuns.check_runs.filter(c =>
+              c.status !== 'completed'
+            );
+
+            const bypassed = failed.length > 0 || pending.length > 0;
+
+            const failedNames = failed.map(c => c.name).join(', ') || 'none';
+            const pendingNames = pending.map(c => c.name).join(', ') || 'none';
+
+            core.setOutput('bypassed', bypassed.toString());
+            core.setOutput('failed_checks', failedNames);
+            core.setOutput('pending_checks', pendingNames);
+
+            if (bypassed) {
+              console.log(`Admin bypass detected — failed: [${failedNames}], pending: [${pendingNames}]`);
+            } else {
+              console.log('All checks passed — no bypass detected');
+            }
+
+      - name: Capture feedback event
+        if: steps.bypass.outputs.bypassed == 'true'
+        env:
+          FAILED_CHECKS: ${{ steps.bypass.outputs.failed_checks }}
+          PENDING_CHECKS: ${{ steps.bypass.outputs.pending_checks }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          bash scripts/capture-feedback.sh \
+            --type ci-failure \
+            --source ci \
+            --summary "PR #${PR_NUMBER} merged with admin bypass — failed: [${FAILED_CHECKS}], pending: [${PENDING_CHECKS}]" \
+            --bucket other \
+            --automatable false || true
+
+      - name: Commit feedback event
+        if: steps.bypass.outputs.bypassed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/feedback/*.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: capture admin bypass feedback for PR #${{ github.event.pull_request.number }}"
+          git push
+
+      - name: Open follow-up issue
+        if: steps.bypass.outputs.bypassed == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          FAILED_CHECKS: ${{ steps.bypass.outputs.failed_checks }}
+          PENDING_CHECKS: ${{ steps.bypass.outputs.pending_checks }}
+        with:
+          script: |
+            const prNumber = process.env.PR_NUMBER;
+            const prTitle = process.env.PR_TITLE;
+            const prAuthor = process.env.PR_AUTHOR;
+            const failedChecks = process.env.FAILED_CHECKS;
+            const pendingChecks = process.env.PENDING_CHECKS;
+
+            const body = [
+              `## Admin Bypass: PR #${prNumber}`,
+              '',
+              `**PR:** #${prNumber} — ${prTitle}`,
+              `**Author:** @${prAuthor}`,
+              `**Merged with bypassed checks:**`,
+              `- Failed: ${failedChecks}`,
+              `- Pending: ${pendingChecks}`,
+              '',
+              '## Post-Merge Verification Checklist',
+              '',
+              '- [ ] Verify the bypassed checks would have passed',
+              '- [ ] Run affected tests locally and confirm passing',
+              '- [ ] Check production deployment is healthy',
+              '- [ ] If checks reveal real issues, open a fix PR',
+              '',
+              '---',
+              '*Auto-generated by Admin Bypass Tracker workflow*',
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Admin Bypass] PR #${prNumber}: ${prTitle}`,
+              body: body,
+              labels: ['admin-bypass', 'follow-up'],
+            });
