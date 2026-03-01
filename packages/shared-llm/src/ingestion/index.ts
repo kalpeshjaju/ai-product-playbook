@@ -13,7 +13,16 @@ export { isHashDuplicate, cosineSimilarity, NEAR_DEDUP_THRESHOLD } from './dedup
 export type { NearDedupResult } from './dedup/index.js';
 export { createIngestionQueue, JobType } from './pipeline/queue.js';
 export type { JobTypeValue } from './pipeline/queue.js';
-export type { IngestionJobData } from './pipeline/jobs.js';
+export type {
+  IngestionJobData,
+  EmbedPayload,
+  EnrichPayload,
+  DedupCheckPayload,
+  ReEmbedPayload,
+  FreshnessPayload,
+  ScrapePayload,
+  IngestionPayload,
+} from './pipeline/jobs.js';
 export { createIngestionWorker } from './pipeline/workers.js';
 export { parseRedisConnection } from './pipeline/connection.js';
 export type { RedisConnectionOptions } from './pipeline/connection.js';
