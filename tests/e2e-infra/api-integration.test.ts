@@ -433,12 +433,10 @@ describe('Memory Routes', () => {
     ).toBe(true);
   });
 
-  it('DELETE /:id returns response (deleted or disabled)', async () => {
-    const { status, body } = await del('/api/memory/fake-memory-id');
-    expect([200]).toContain(status);
-    expect(
-      body.deleted !== undefined || (body as Record<string, unknown>).enabled === false
-    ).toBe(true);
+  it('DELETE /:id returns 403 (IDOR prevents deleting other users memory)', async () => {
+    // /api/memory/:segment is IDOR-protected — only the authenticated user's ID is allowed
+    const { status } = await del('/api/memory/fake-memory-id');
+    expect(status).toBe(403);
   });
 });
 
