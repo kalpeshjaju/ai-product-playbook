@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { PostHogProvider } from '../providers/posthog-provider';
 import { ClerkProviderShell } from '../providers/clerk-provider-shell';
 import { NavLink } from '@playbook/shared-ui';
@@ -83,6 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <html lang="en">
         <body className="font-sans antialiased bg-gray-50 text-gray-900">
           <PostHogProvider>{adminContent}</PostHogProvider>
+          <SpeedInsights />
         </body>
       </html>
     );
@@ -98,6 +100,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {userId ? adminContent : <AuthGate>{adminContent}</AuthGate>}
           </ClerkProviderShell>
         </PostHogProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
