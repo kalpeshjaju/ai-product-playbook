@@ -200,25 +200,30 @@ jobs:
           TEST_API_KEY: test-api-key-for-ci
           TEST_ADMIN_KEY: test-admin-key-for-ci
 
-      # ─── Full-stack E2E (Playwright + web + admin dev servers) ───
+      # ─── Full-stack E2E (Playwright + production-built web + admin) ───
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Start web dev server (port 3000)
-        run: npx turbo run dev --filter=@playbook/web &
+      - name: Build web + admin for E2E
+        run: npx turbo run build --filter=@playbook/web --filter=@playbook/admin
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3002
+
+      - name: Start web production server (port 3000)
+        run: npx next start apps/web --port 3000 &
         env:
           PORT: '3000'
           NEXT_PUBLIC_API_URL: http://localhost:3002
 
-      - name: Start admin dev server (port 3001)
-        run: npx turbo run dev --filter=@playbook/admin &
+      - name: Start admin production server (port 3001)
+        run: npx next start apps/admin --port 3001 &
         env:
           PORT: '3001'
           NEXT_PUBLIC_API_URL: http://localhost:3002
 
       - name: Wait for web + admin servers
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 120); do
             WEB=$(curl -sf http://localhost:3000 > /dev/null 2>&1 && echo ok || echo waiting)
             ADMIN=$(curl -sf http://localhost:3001 > /dev/null 2>&1 && echo ok || echo waiting)
             if [ "$WEB" = "ok" ] && [ "$ADMIN" = "ok" ]; then
@@ -227,7 +232,7 @@ jobs:
             fi
             sleep 1
           done
-          echo "Dev servers failed to start within 60s"
+          echo "Servers failed to start within 120s"
           exit 1
 
       - name: Run fullstack E2E tests

@@ -11,6 +11,8 @@
 name: Chromatic
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -44,3 +46,4 @@ jobs:
           buildScriptName: build-storybook
           exitZeroOnChanges: true
           exitOnceUploaded: true
+          autoAcceptChanges: main
