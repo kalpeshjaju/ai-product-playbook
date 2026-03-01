@@ -9,6 +9,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Queue } from 'bullmq';
+import type { IngestionJobData } from '@playbook/shared-llm';
 import {
   IngesterRegistry,
   DocumentIngester,
@@ -17,8 +19,21 @@ import {
   WebIngester,
   CsvIngester,
   ApiFeedIngester,
+  createIngestionQueue,
+  JobType,
 } from '@playbook/shared-llm';
 import { persistDocument } from '../services/document-persistence.js';
+
+/** Lazy-initialized queue — only created when REDIS_URL is set */
+let ingestionQueue: Queue<IngestionJobData> | null = null;
+
+function getQueue(): Queue<IngestionJobData> | null {
+  if (ingestionQueue) return ingestionQueue;
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
+  ingestionQueue = createIngestionQueue(redisUrl);
+  return ingestionQueue;
+}
 
 const registry = new IngesterRegistry();
 registry.register(new DocumentIngester());
@@ -104,6 +119,26 @@ export async function handleIngestRoutes(
         return;
       }
 
+      // Fire-and-forget: enqueue async enrichment jobs (fail-open — queue down doesn't block ingest)
+      const queue = getQueue();
+      if (queue && persistResult.persisted) {
+        const docId = persistResult.documentId;
+        Promise.allSettled([
+          queue.add(JobType.ENRICH, {
+            type: 'enrich',
+            documentId: docId,
+            payload: { content: ingestResult.text },
+          }),
+          queue.add(JobType.DEDUP_CHECK, {
+            type: 'dedup-check',
+            documentId: docId,
+            payload: { contentHash: ingestResult.contentHash, embedding: [] },
+          }),
+        ]).catch(() => {
+          process.stderr.write(`WARN: Failed to enqueue async jobs for doc ${docId}\n`);
+        });
+      }
+
       // 207 if doc stored but embeddings failed; 201 for full success
       res.statusCode = persistResult.partialFailure ? 207 : 201;
       res.end(JSON.stringify({
@@ -114,6 +149,7 @@ export async function handleIngestRoutes(
         embeddingsGenerated: persistResult.embeddingsGenerated,
         embeddingModelId: persistResult.embeddingModelId,
         contentHash: persistResult.contentHash,
+        queued: !!queue,
       }));
       return;
     }
