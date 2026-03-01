@@ -459,10 +459,17 @@ describe('Playbook Entries (Postgres)', () => {
 });
 
 describe('Users (Clerk)', () => {
-  it('returns users list (array)', async () => {
-    const { status, body } = await get('/api/users');
-    expect(status).toBe(200);
-    // Array — either Clerk users or empty (CLERK_SECRET_KEY not set in CI)
+  it('requires admin auth (403 without x-admin-key)', async () => {
+    const { status } = await get('/api/users');
+    expect(status).toBe(403);
+  });
+
+  it('returns users list with admin auth', async () => {
+    const res = await fetch(`${API_URL}/api/users`, {
+      headers: { 'x-api-key': TEST_API_KEY, 'x-admin-key': TEST_ADMIN_KEY },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
   });
 });
