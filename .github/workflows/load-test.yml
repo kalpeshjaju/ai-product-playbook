@@ -1,0 +1,120 @@
+##
+# FILE PURPOSE: k6 load testing workflow — performance validation
+#
+# WHY: Catch latency regressions and validate rate limiting before production.
+#      Runs against a real API instance with Postgres + Redis.
+# HOW: Manual trigger only (workflow_dispatch). Runs k6 smoke scenario
+#      against a CI-local API server with real services.
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-03-01
+##
+
+name: Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'k6 scenario to run'
+        required: false
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - full
+
+concurrency:
+  group: load-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: playbook_test
+          POSTGRES_PASSWORD: test_password_ci
+          POSTGRES_DB: playbook_test
+        options: >-
+          --health-cmd "pg_isready -U playbook_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Disable needrestart for zerox postinstall
+        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Build API
+        run: npx turbo run build --filter=@playbook/api...
+
+      - name: Push schema to test DB
+        working-directory: apps/api
+        run: npx drizzle-kit push --force
+        env:
+          DATABASE_URL: postgresql://playbook_test:test_password_ci@localhost:5432/playbook_test
+
+      - name: Start API server
+        run: node apps/api/dist/server.js &
+        env:
+          PORT: '3002'
+          NODE_ENV: test
+          DATABASE_URL: postgresql://playbook_test:test_password_ci@localhost:5432/playbook_test
+          REDIS_URL: redis://localhost:6379
+          API_KEYS: ''
+          ADMIN_API_KEY: test-admin-key
+
+      - name: Wait for API
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -sf http://localhost:3002/api/health; then
+              echo " API is ready"
+              exit 0
+            fi
+            echo "Waiting for API... attempt $i"
+            sleep 5
+          done
+          echo "API failed to start"
+          exit 1
+
+      - name: Run k6 smoke test
+        if: inputs.scenario == 'smoke'
+        run: k6 run -e API_URL=http://localhost:3002 --out json=k6-results.json tests/load/api-load.js --scenarios '{"smoke":{}}'
+
+      - name: Run k6 full test
+        if: inputs.scenario == 'full'
+        run: k6 run -e API_URL=http://localhost:3002 --out json=k6-results.json tests/load/api-load.js
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: k6-results.json
+          retention-days: 14

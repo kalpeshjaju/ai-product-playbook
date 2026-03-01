@@ -15,6 +15,13 @@
       "when": 1772423253247,
       "tag": "0001_add_hnsw_index",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772509653247,
+      "tag": "0002_input_pillar_columns",
+      "breakpoints": true
     }
   ]
 }
