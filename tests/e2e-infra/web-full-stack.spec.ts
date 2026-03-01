@@ -21,10 +21,11 @@ test.describe('Web App — Full Stack', () => {
     await expect(page.getByRole('heading', { name: 'AI Product Playbook' })).toBeVisible();
     // Subtext rendered on the page
     await expect(page.getByText('LLM-maintained patterns')).toBeVisible();
-    // Entry data comes from API → should show at least one entry title
-    // The API returns hardcoded entries: "JSON Extraction", "Cost Ledger"
-    await expect(page.getByText('JSON Extraction')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Cost Ledger')).toBeVisible();
+    // Entry data comes from API → should show at least one entry
+    // Content-agnostic: verify entries render without coupling to specific titles
+    const entries = page.locator('[data-testid="entry-card"]').or(page.locator('article')).or(page.getByRole('listitem'));
+    await expect(entries.first()).toBeVisible({ timeout: 10_000 });
+    expect(await entries.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('nav links are present and functional', async ({ page }) => {

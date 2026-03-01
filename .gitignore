@@ -41,6 +41,9 @@ test-results/
 # Turbo
 .turbo/
 
+# Security
+.cache_ggshield
+
 # Misc
 *.log
 tmp/

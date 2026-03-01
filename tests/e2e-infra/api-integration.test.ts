@@ -446,24 +446,34 @@ describe('Embedding Routes (validation)', () => {
 // ─── Composio Routes (fail-open) ──────────────────────────────
 
 describe('Composio Routes (fail-open)', () => {
-  it('returns disabled message when COMPOSIO_API_KEY not set', async () => {
+  it('returns deterministic response based on API key presence', async () => {
     const { status, body } = await get('/api/composio/actions');
-    // Without API key, should fail-open with enabled: false
     expect(status).toBe(200);
-    expect(body.enabled).toBe(false);
-    expect(body.message).toContain('COMPOSIO_API_KEY');
+    if (process.env.COMPOSIO_API_KEY) {
+      // Key present — route should be enabled
+      expect(body.enabled).not.toBe(false);
+    } else {
+      // No key — should fail-open with disabled message
+      expect(body.enabled).toBe(false);
+      expect(body.message).toContain('COMPOSIO_API_KEY');
+    }
   });
 });
 
 // ─── OpenPipe Routes (fail-open) ──────────────────────────────
 
 describe('OpenPipe Routes (fail-open)', () => {
-  it('returns disabled message when OPENPIPE_API_KEY not set', async () => {
+  it('returns deterministic response based on API key presence', async () => {
     const { status, body } = await get('/api/openpipe/finetune/test-job');
-    // Without API key, should fail-open with enabled: false
     expect(status).toBe(200);
-    expect(body.enabled).toBe(false);
-    expect(body.message).toContain('OPENPIPE_API_KEY');
+    if (process.env.OPENPIPE_API_KEY) {
+      // Key present — route should be enabled
+      expect(body.enabled).not.toBe(false);
+    } else {
+      // No key — should fail-open with disabled message
+      expect(body.enabled).toBe(false);
+      expect(body.message).toContain('OPENPIPE_API_KEY');
+    }
   });
 });
 
