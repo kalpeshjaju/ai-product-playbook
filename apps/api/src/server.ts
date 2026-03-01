@@ -30,6 +30,7 @@ import { handleTranscriptionRoutes } from './routes/transcription.js';
 import { handleFewShotRoutes } from './routes/few-shot.js';
 import { handleEntryRoutes } from './routes/entries.js';
 import { handleUserRoutes } from './routes/users.js';
+import { handleIngestRoutes } from './routes/ingest.js';
 import { authenticateRequest, verifyUserOwnership } from './middleware/auth.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 import { db } from './db/index.js';
@@ -193,7 +194,7 @@ const server = createServer(async (req, res) => {
   }
 
   // ─── Token-based rate limiting on LLM routes (§18) ───
-  if (url.startsWith('/api/chat') || url.startsWith('/api/generate') || url.startsWith('/api/documents') || url.startsWith('/api/embeddings')) {
+  if (url.startsWith('/api/chat') || url.startsWith('/api/generate') || url.startsWith('/api/documents') || url.startsWith('/api/embeddings') || url.startsWith('/api/ingest')) {
     const userId = getUserId(req);
     const budget = await checkTokenBudget(userId, 500); // estimate 500 tokens per request
     if (!budget.allowed) {
@@ -299,6 +300,12 @@ const server = createServer(async (req, res) => {
   // ─── Users from Clerk (DEC-006: Clerk, not Strapi) ───
   if (url.startsWith('/api/users')) {
     await handleUserRoutes(req, res, url);
+    return;
+  }
+
+  // ─── Unified ingestion (§19 Input Pillar) ───
+  if (url.startsWith('/api/ingest')) {
+    await handleIngestRoutes(req, res, url);
     return;
   }
 

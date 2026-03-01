@@ -95,3 +95,17 @@ export type { RequestLike, UserContext, LangfuseHeaders } from './identity/index
 export type { IngestResult, IngestOptions, Ingester, ChunkStrategy } from './ingestion/index.js';
 export { computeContentHash } from './ingestion/index.js';
 export { IngesterRegistry } from './ingestion/index.js';
+export { DocumentIngester } from './ingestion/index.js';
+export { AudioIngester } from './ingestion/index.js';
+export { ImageIngester } from './ingestion/index.js';
+export { WebIngester } from './ingestion/index.js';
+export { CsvIngester } from './ingestion/index.js';
+export { ApiFeedIngester } from './ingestion/index.js';
+export { computeFreshnessMultiplier } from './ingestion/index.js';
+export { isHashDuplicate, cosineSimilarity, NEAR_DEDUP_THRESHOLD } from './ingestion/index.js';
+export type { NearDedupResult } from './ingestion/index.js';
+export { chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, selectChunker } from './ingestion/index.js';
+export { createIngestionQueue, JobType } from './ingestion/index.js';
+export type { JobTypeValue } from './ingestion/index.js';
+export type { IngestionJobData } from './ingestion/index.js';
+export { createIngestionWorker } from './ingestion/index.js';
