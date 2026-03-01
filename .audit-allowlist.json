@@ -16,5 +16,71 @@
     "expires": "2026-06-01",
     "addedBy": "Claude Opus 4.6",
     "addedOn": "2026-03-01"
+  },
+  "@sentry/nextjs": {
+    "reason": "Transitive via @sentry/webpack-plugin → webpack chain; build-time only, not exploitable at runtime",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "@sentry/webpack-plugin": {
+    "reason": "Transitive via webpack; build-time dependency only",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "cacache": {
+    "reason": "Transitive via tar → node-gyp → make-fetch-happen chain; build-time only",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "make-fetch-happen": {
+    "reason": "Transitive via node-gyp → cacache chain; build-time dependency",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "mem0ai": {
+    "reason": "Transitive via sqlite3 + @qdrant/js-client-rest; server-side only, not user-facing",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "node-gyp": {
+    "reason": "Transitive via sqlite3 → tar chain; build-time native compilation tool",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "serialize-javascript": {
+    "reason": "Transitive via terser-webpack-plugin; build-time only, not processing untrusted input",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "sqlite3": {
+    "reason": "Transitive via mem0ai; server-side memory store, not exposed to untrusted tar archives",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "tar": {
+    "reason": "Transitive via node-gyp/sqlite3/cacache; build-time only, not processing untrusted archives",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "terser-webpack-plugin": {
+    "reason": "Transitive via webpack → serialize-javascript; build-time bundler plugin",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  },
+  "webpack": {
+    "reason": "Transitive via @sentry/webpack-plugin + terser-webpack-plugin; build-time bundler",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
   }
 }
