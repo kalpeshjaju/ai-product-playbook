@@ -111,3 +111,95 @@ apps/api/
 3. Read `docs/LEARNING_JOURNAL.md` (at minimum the Anti-Pattern Registry at the bottom)
 4. Check git log for recent context
 5. Ask if anything is unclear — don't guess
+
+---
+
+## LLM Coding Framework (6 Pillars)
+
+> Every LLM (Claude, Codex, Cursor, Gemini) must follow this framework.
+> These are not suggestions — they are enforced by git hooks, CI, and CodeRabbit.
+
+### Pillar 1: Task Contract (before coding)
+
+Before writing any code, produce or verify a task contract:
+- **Goal**: One sentence — what this achieves
+- **Non-Goals**: What this explicitly does NOT do
+- **Modules Touched**: Every file/directory that will be modified
+- **Acceptance Criteria**: Testable conditions that prove the task is done
+- **Rollback Plan**: How to undo if it breaks production
+- **Anti-Patterns Checked**: Which entries from `docs/LEARNING_JOURNAL.md` are relevant
+
+Template: `docs/contracts/TEMPLATE.md`. Save contracts to `docs/contracts/YYYY-MM-DD-<topic>.md`.
+
+If the user's request doesn't include a contract, generate one and get approval before coding.
+
+### Pillar 2: Change Impact Graph (before and after coding)
+
+Before pushing, run: `bash scripts/impact-graph.sh`
+
+This maps your changed files to:
+- **Must-run tests** (which test suites are affected)
+- **High-risk areas** (auth, data, shared packages, etc.)
+- **Review checklist** (what the reviewer must verify)
+
+Run the must-run tests before pushing. The pre-push hook runs this automatically. CI posts impact analysis as a PR comment.
+
+### Pillar 3: Context Pack (before coding)
+
+Before implementation, retrieve and read:
+1. This file (`CLAUDE.md`)
+2. `docs/LEARNING_JOURNAL.md` — at minimum the Anti-Pattern Registry table
+3. Relevant test files for modules you're about to touch
+4. Recent `docs/feedback/*.json` events for the modules you're touching
+
+Do NOT code without reading the anti-pattern registry. This is enforced by the Learning Journal protocol in memory.
+
+### Pillar 4: Two-Layer Validation (during and after coding)
+
+**Layer A (fast, every commit):**
+- Type-check: `npx turbo run type-check`
+- Lint: `npx turbo run lint`
+- Impacted unit tests (from impact graph)
+
+**Layer B (full, every push/PR):**
+- Full test suite: `npx turbo run test`
+- Build: `npx turbo run build`
+- Contract tests: `npm run test:contract`
+- E2E (if UI changed): `npm run test:e2e:fullstack`
+- Hallucination check (CI runs automatically)
+
+Pre-push hook enforces Layer B. CI enforces both layers.
+
+### Pillar 5: Anti-Fake Outputs (always)
+
+**No claimed behavior without evidence.**
+
+- Every PR must have a `## Proof` section with real execution output
+- `curl` output for API changes, test output for logic changes, screenshots for UI changes
+- Confidence score required: VERIFIED (0.95) / HIGH (0.85) / MEDIUM (0.70) / LOW (0.40)
+- Below 0.70 triggers mandatory cross-LLM review
+- CodeRabbit is configured to flag: stub returns, empty catches, hallucinated imports, raw `JSON.parse()` on LLM output
+
+### Pillar 6: Memory + Recurrence (after every session/PR)
+
+**Every failure becomes a permanent check.**
+
+1. **Session level**: Run `/reflect` at end of meaningful sessions — updates Learning Journal
+2. **PR level**: CI failures and CodeRabbit findings are captured to `docs/feedback/*.json` via `scripts/capture-feedback.sh`
+3. **Escalation**: When a root-cause bucket hits 3+ occurrences — `scripts/scan-escalations.sh` flags it — convert to ESLint rule, CI check, or hook
+
+The goal: an empty anti-pattern registry — not because we stopped finding problems, but because every problem became an automated check.
+
+### Maker-Checker Model
+
+| Role | Who | When |
+|---|---|---|
+| **Maker** | Any LLM | Writes code |
+| **Auto-Checker** | CodeRabbit | Every PR, automatic |
+| **Gate Enforcer** | Git hooks + CI | Every commit/push/PR |
+| **Cross-Checker** | Different LLM than maker | Confidence < 0.70 or high-risk area |
+| **Memory Keeper** | `/reflect` skill | End of session |
+
+Branch naming convention for maker detection: `claude/feature-name`, `codex/feature-name`, `cursor/feature-name`, `gemini/feature-name`.
+
+The multi-LLM review workflow (`.github/workflows/multi-llm-review.yml`) detects the maker LLM from branch name or Co-Authored-By and suggests a different reviewer.

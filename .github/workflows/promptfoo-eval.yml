@@ -33,7 +33,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.LITELLM_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          promptfoo-config: packages/shared-llm/promptfooconfig.yaml
+          config: packages/shared-llm/promptfooconfig.yaml
           cache-path: ~/.cache/promptfoo
         env:
           OPENAI_BASE_URL: ${{ secrets.LITELLM_PROXY_URL }}

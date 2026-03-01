@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm ci --legacy-peer-deps --ignore-scripts",
-  "buildCommand": "npx turbo run build --filter=@playbook/admin"
+  "buildCommand": "npx turbo run build --filter=@playbook/admin",
+  "outputDirectory": ".next"
 }

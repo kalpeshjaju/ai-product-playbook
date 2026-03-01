@@ -8,7 +8,7 @@
  * LAST UPDATED: 2026-03-01
  */
 
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import MemoryPage from './page';
 
 const meta: Meta<typeof MemoryPage> = {

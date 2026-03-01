@@ -7,7 +7,7 @@
  * LAST UPDATED: 2026-03-01
  */
 
-import type { Preview } from '@storybook/react';
+import type { Preview } from '@storybook/nextjs-vite';
 
 const preview: Preview = {
   parameters: {
