@@ -44,7 +44,7 @@ model_list:
   # ─── LlamaGuard (Output Guardrails, §21) ────────────────────
   - model_name: llamaguard
     litellm_params:
-      model: together_ai/meta-llama/Meta-Llama-Guard-3-8B
+      model: together_ai/meta-llama/Llama-Guard-4-12B
       api_key: "os.environ/TOGETHER_AI_API_KEY"
 
 # ─── LiteLLM settings ──────────────────────────────────────────────
