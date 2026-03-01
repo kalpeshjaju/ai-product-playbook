@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.39.0",
+    "@playbook/shared-llm": "*",
     "@playbook/shared-types": "*",
     "@playbook/shared-ui": "*",
     "@sentry/nextjs": "^10.40.0",
