@@ -149,7 +149,7 @@ jobs:
       REDIS_URL: redis://localhost:6379
       NODE_ENV: test
       ADMIN_API_KEY: test-admin-key-for-ci
-      AUTH_MODE: open
+      AUTH_MODE: strict
       API_KEYS: test-api-key-for-ci
       API_INTERNAL_KEY: test-internal-key-for-ci
     steps:
@@ -199,6 +199,47 @@ jobs:
           E2E_API_URL: http://localhost:3002
           TEST_API_KEY: test-api-key-for-ci
           TEST_ADMIN_KEY: test-admin-key-for-ci
+
+      # ─── Full-stack E2E (Playwright + web + admin dev servers) ───
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start web dev server (port 3000)
+        run: npx turbo run dev --filter=@playbook/web &
+        env:
+          PORT: '3000'
+          NEXT_PUBLIC_API_URL: http://localhost:3002
+
+      - name: Start admin dev server (port 3001)
+        run: npx turbo run dev --filter=@playbook/admin &
+        env:
+          PORT: '3001'
+          NEXT_PUBLIC_API_URL: http://localhost:3002
+
+      - name: Wait for web + admin servers
+        run: |
+          for i in $(seq 1 60); do
+            WEB=$(curl -sf http://localhost:3000 > /dev/null 2>&1 && echo ok || echo waiting)
+            ADMIN=$(curl -sf http://localhost:3001 > /dev/null 2>&1 && echo ok || echo waiting)
+            if [ "$WEB" = "ok" ] && [ "$ADMIN" = "ok" ]; then
+              echo "Web + Admin servers healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Dev servers failed to start within 60s"
+          exit 1
+
+      - name: Run fullstack E2E tests
+        run: npx playwright test --config=playwright.e2e.config.ts
+
+      - name: Upload fullstack E2E report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullstack-e2e-report
+          path: playwright-report/
+          retention-days: 14
 
   # ─── E2E smoke tests (Playwright) ─────────────────────────────────
   e2e:

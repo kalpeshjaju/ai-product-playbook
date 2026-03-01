@@ -14,11 +14,9 @@
 
 import { test, expect } from '@playwright/test';
 
-const ADMIN_URL = 'http://localhost:3001';
-
 test.describe('Admin App — Full Stack', () => {
   test('admin homepage loads with user data from API', async ({ page }) => {
-    await page.goto(ADMIN_URL);
+    await page.goto('/');
     // Sidebar brand
     await expect(page.getByText('Admin')).toBeVisible();
     // Users page heading
@@ -28,21 +26,21 @@ test.describe('Admin App — Full Stack', () => {
   });
 
   test('admin sidebar navigation works', async ({ page }) => {
-    await page.goto(ADMIN_URL);
+    await page.goto('/');
     await expect(page.getByRole('link', { name: 'Memory' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Prompts' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Costs' })).toBeVisible();
   });
 
   test('memory browser page loads', async ({ page }) => {
-    await page.goto(`${ADMIN_URL}/memory`);
+    await page.goto('/memory');
     await expect(page.getByRole('heading', { name: 'Memory Browser' })).toBeVisible();
     // The memory browser has a userId input field
     await expect(page.getByRole('textbox')).toBeVisible({ timeout: 10_000 });
   });
 
   test('admin cost dashboard loads with real data', async ({ page }) => {
-    await page.goto(`${ADMIN_URL}/costs`);
+    await page.goto('/costs');
     await expect(page.getByRole('heading', { name: 'Cost Dashboard' })).toBeVisible();
     // DataCards from /api/costs
     await expect(page.getByText('Total Cost')).toBeVisible({ timeout: 10_000 });
@@ -51,7 +49,7 @@ test.describe('Admin App — Full Stack', () => {
   });
 
   test('admin prompts page loads', async ({ page }) => {
-    await page.goto(`${ADMIN_URL}/prompts`);
+    await page.goto('/prompts');
     await expect(page.getByRole('heading', { name: 'Prompt Management' })).toBeVisible();
     // Prompt manager form should be visible
     await expect(page.getByText('Create Prompt Version')).toBeVisible({ timeout: 10_000 });
