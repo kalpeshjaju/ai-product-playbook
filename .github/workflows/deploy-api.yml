@@ -66,10 +66,10 @@ jobs:
       - run: npm ci --legacy-peer-deps
 
       - name: Enable pgvector extension on Railway Postgres
+        continue-on-error: true
         run: |
           if [ -n "$DATABASE_URL" ]; then
-            psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
-            echo "pgvector extension enabled"
+            psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;" && echo "pgvector extension enabled" || echo "WARN: pgvector not available on this Postgres instance — embedding search won't work until upgraded"
           else
             echo "WARN: DATABASE_URL not set — skipping pgvector extension"
           fi
