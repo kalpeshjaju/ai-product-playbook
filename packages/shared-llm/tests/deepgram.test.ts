@@ -9,7 +9,7 @@ import { transcribeAudio } from '../src/transcription/deepgram.js';
 
 const originalFetch = globalThis.fetch;
 
-describe('transcribeAudio', () => {
+describe('transcribeAudio — basic', () => {
   beforeEach(() => {
     vi.stubEnv('DEEPGRAM_API_KEY', 'test-key');
   });
@@ -104,7 +104,17 @@ describe('transcribeAudio', () => {
     expect(callUrl).toContain('language=es');
   });
 
-  // ── Retry behavior ────────────────────────────────────────────────────────
+});
+
+describe('transcribeAudio — retry behavior', () => {
+  beforeEach(() => {
+    vi.stubEnv('DEEPGRAM_API_KEY', 'test-key');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.unstubAllEnvs();
+  });
 
   it('retries on 429 then succeeds', async () => {
     vi.useFakeTimers();
