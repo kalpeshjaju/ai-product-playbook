@@ -1,0 +1,17 @@
+# LiteLLM Proxy — Railway deployment config
+#
+# WHY: Central LLM gateway. All apps call this instead of providers directly.
+# HOW: Uses the existing Dockerfile. Exposes port 4000 with health check.
+#
+# Required env vars on Railway:
+#   ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, TOGETHER_AI_API_KEY
+#   LITELLM_MASTER_KEY, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+#   LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY (optional — enables observability)
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

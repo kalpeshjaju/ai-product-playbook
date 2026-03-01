@@ -21,7 +21,8 @@
     "test:e2e": "playwright test",
     "test:e2e:fullstack": "playwright test --config=playwright.e2e.config.ts",
     "test:contract": "vitest run --config vitest.e2e.config.ts",
-    "test:e2e:infra": "bash scripts/test-e2e-infra.sh",
+    "dev:local": "bash scripts/dev-local.sh",
+    "dev:check": "bash scripts/dev-local.sh --check",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
