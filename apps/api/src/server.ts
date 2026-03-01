@@ -13,7 +13,7 @@
 import * as Sentry from '@sentry/node';
 import { createServer, type IncomingMessage } from 'node:http';
 import { createUserContext } from '@playbook/shared-llm';
-import { checkTokenBudget, shutdownRedis } from './rate-limiter.js';
+import { checkTokenBudget, shutdownRedis, pingRedis } from './rate-limiter.js';
 import { checkCostBudget } from './cost-guard.js';
 import { verifyTurnstileToken } from './middleware/turnstile.js';
 import { handlePromptRoutes } from './routes/prompts.js';
@@ -123,7 +123,29 @@ const server = createServer(async (req, res) => {
       // DB unreachable
     }
 
-    const status = dbStatus === 'ok' ? 'ok' : 'degraded';
+    // Redis health
+    const redisStatus = await pingRedis();
+
+    // LiteLLM proxy health
+    let litellmStatus: 'ok' | 'unreachable' | 'not_configured' = 'not_configured';
+    const litellmUrl = process.env.LITELLM_PROXY_URL;
+    if (litellmUrl) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        const litellmRes = await fetch(`${litellmUrl}/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        litellmStatus = litellmRes.ok ? 'ok' : 'unreachable';
+      } catch {
+        litellmStatus = 'unreachable';
+      }
+    }
+
+    // Overall status: degraded if any critical service is down
+    const allOk = dbStatus === 'ok'
+      && (redisStatus === 'ok' || !process.env.REDIS_URL)
+      && (litellmStatus !== 'unreachable');
+    const status = allOk ? 'ok' : 'degraded';
     const statusCode = dbStatus === 'ok' ? 200 : 503;
 
     res.statusCode = statusCode;
@@ -133,6 +155,8 @@ const server = createServer(async (req, res) => {
       uptimeSeconds,
       services: {
         database: dbStatus,
+        redis: redisStatus,
+        litellm: litellmStatus,
       },
     }));
     return;

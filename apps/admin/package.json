@@ -14,7 +14,7 @@
     "@clerk/nextjs": "^6.39.0",
     "@playbook/shared-types": "*",
     "@playbook/shared-ui": "*",
-    "@sentry/nextjs": "^9.0.0",
+    "@sentry/nextjs": "^10.40.0",
     "next": "^15.0.0",
     "posthog-js": "^1.356.1",
     "react": "^19.0.0",

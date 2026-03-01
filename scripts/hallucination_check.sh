@@ -1,11 +1,12 @@
 #!/bin/bash
-# Hallucination & Integrity Detection Script
+# Hallucination & Integrity Detection Script — BLOCKING CI GATE
 #
 # WHY: LLMs fabricate imports, env vars, file references, and API endpoints.
 #      This script catches those before they reach production.
 #
 # HOW: Static analysis of changed files — checks imports, env vars, file
 #      references, and common fabrication patterns against the actual codebase.
+#      Exits non-zero on any fabricated data, debug artifacts, or undocumented env vars.
 #
 # USAGE:
 #   bash scripts/hallucination_check.sh                          # Check all files
@@ -115,7 +116,7 @@ while IFS= read -r f; do
 done <<< "$CHANGED_ALL"
 
 if [ -n "$FABRICATION_FOUND" ]; then
-  add_warning "Potential fabricated data found (verify manually):"$'\n'"$FABRICATION_FOUND"
+  add_error "Fabricated data patterns found in production code:"$'\n'"$FABRICATION_FOUND"
 else
   add_pass "No obvious fabricated data patterns detected"
 fi
@@ -155,7 +156,7 @@ while IFS= read -r f; do
 done <<< "$CHANGED_ALL"
 
 if [ -n "$DEBUG_FOUND" ]; then
-  add_warning "Debug statements found in production code:"$'\n'"$DEBUG_FOUND"
+  add_error "Debug statements found in production code:"$'\n'"$DEBUG_FOUND"
 else
   add_pass "No debug artifacts (print/console.log) in production code"
 fi
@@ -191,7 +192,7 @@ if [ -f ".env.example" ]; then
   done <<< "$USED_ENVS"
 
   if [ -n "$MISSING_ENVS" ]; then
-    add_warning "Env vars used in code but missing from .env.example:"$'\n'"$MISSING_ENVS"
+    add_error "Env vars used in code but missing from .env.example:"$'\n'"$MISSING_ENVS"
   else
     add_pass "All environment variables documented in .env.example"
   fi

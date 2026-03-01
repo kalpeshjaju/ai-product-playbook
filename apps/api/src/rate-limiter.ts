@@ -107,6 +107,18 @@ export async function checkTokenBudget(
   }
 }
 
+/** Ping Redis — returns 'ok' if reachable, 'unreachable' otherwise. */
+export async function pingRedis(): Promise<'ok' | 'unreachable'> {
+  const client = getRedis();
+  if (!client) return 'unreachable';
+  try {
+    await client.ping();
+    return 'ok';
+  } catch {
+    return 'unreachable';
+  }
+}
+
 /** Disconnect Redis gracefully. Call during server shutdown. */
 export async function shutdownRedis(): Promise<void> {
   if (redis) {

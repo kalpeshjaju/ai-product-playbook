@@ -51,6 +51,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Enable pgvector extension on Railway Postgres
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            npx tsx -e "
+              const pg = require('postgres');
+              const sql = pg(process.env.DATABASE_URL);
+              await sql\`CREATE EXTENSION IF NOT EXISTS vector\`;
+              await sql.end();
+              console.log('pgvector extension enabled');
+            "
+          else
+            echo "WARN: DATABASE_URL not set — skipping pgvector extension"
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Apply database migrations
+        run: npx drizzle-kit push --config apps/api/drizzle.config.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 

@@ -43,6 +43,7 @@ vi.mock('../src/middleware/posthog.js', () => ({
 vi.mock('../src/rate-limiter.js', () => ({
   checkTokenBudget: vi.fn().mockResolvedValue({ allowed: true, remaining: 99500, limit: 100000 }),
   shutdownRedis: vi.fn().mockResolvedValue(undefined),
+  pingRedis: vi.fn().mockResolvedValue('ok'),
 }));
 
 vi.mock('../src/cost-guard.js', () => ({

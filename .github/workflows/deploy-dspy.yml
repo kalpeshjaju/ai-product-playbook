@@ -1,0 +1,37 @@
+##
+# FILE PURPOSE: Deploy DSPy optimizer to Railway on push to main
+#
+# WHY: Path-filtered deploys — only deploys when DSPy optimizer code changes.
+# HOW: Railway CLI deploy using the Dockerfile in services/dspy/.
+#      DSPy runs as a one-shot worker (restartPolicyType: NEVER in railway.toml).
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-03-01
+##
+
+name: Deploy DSPy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/dspy/**'
+
+concurrency:
+  group: deploy-dspy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service dspy-optimizer
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
