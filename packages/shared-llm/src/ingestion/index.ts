@@ -7,3 +7,4 @@ export { AudioIngester } from './adapters/audio.js';
 export { ImageIngester } from './adapters/image.js';
 export { WebIngester } from './adapters/web.js';
 export { CsvIngester } from './adapters/csv.js';
+export { ApiFeedIngester } from './adapters/api-feed.js';
