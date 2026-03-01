@@ -872,3 +872,51 @@ Cloudflare Turnstile verification on `/api/chat*` routes:
   "error": "Bot verification failed"
 }
 ```
+
+---
+
+## Unified Ingestion (§19)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | /api/ingest | Ingest content of any supported MIME type |
+| GET | /api/ingest/types | List supported MIME types |
+
+### POST /api/ingest
+
+Accepts raw content with appropriate `Content-Type` header. Dispatches to the correct adapter via IngesterRegistry.
+
+**Request:**
+- `Content-Type`: The MIME type of the content being ingested (e.g., `text/plain`, `text/csv`, `audio/wav`, `image/png`, `text/x-uri`, `application/x-api-feed`)
+- Body: Raw content bytes
+
+**Response (201):**
+```json
+{
+  "text": "First 500 characters of extracted text...",
+  "sourceType": "document",
+  "mimeType": "text/plain",
+  "contentHash": "sha256-hex-string",
+  "metadata": {},
+  "textLength": 1234
+}
+```
+
+**Error (422):**
+```json
+{
+  "error": "Unsupported or failed ingestion for Content-Type: video/mp4",
+  "supportedTypes": ["text/plain", "text/csv", "application/pdf", ...]
+}
+```
+
+### GET /api/ingest/types
+
+Returns list of currently supported MIME types.
+
+**Response (200):**
+```json
+{
+  "supportedTypes": ["text/plain", "text/markdown", "text/csv", "application/pdf", "image/png", "image/jpeg", "audio/wav", "audio/mp3", ...]
+}
+```

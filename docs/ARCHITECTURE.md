@@ -85,6 +85,32 @@ Two-layer approach (§22):
 3. **Promotion ladder** → 0% → 10% → 50% → 100%
 4. **Quality gate** → `eval_score >= 0.70` required to promote beyond 10%
 
+## Ingestion Pipeline (§19)
+
+All input modalities route through the `IngesterRegistry`:
+
+```
+Content → IngesterRegistry → [DocumentIngester | AudioIngester | ImageIngester | WebIngester | CsvIngester | ApiFeedIngester]
+                                       ↓
+                              IngestResult { text, sourceType, contentHash, metadata }
+                                       ↓
+                              Chunking → Embedding → Dedup → Store
+                                       ↓
+                              BullMQ Pipeline (async enrichment, re-embedding, freshness)
+```
+
+**Adapters:** Each implements the `Ingester` interface (`canHandle` + `ingest`). Registry dispatches by MIME type. Adding a new modality = implement `Ingester` + register it.
+
+**Chunking:** 4 strategies — fixed (default), sliding-window (transcripts), per-entity (CSV rows), semantic (stub, LLM-based boundary detection deferred).
+
+**Dedup:** Two-pass — hash-based exact dedup (SHA-256) + near-dedup via cosine similarity on embedding vectors (threshold > 0.95).
+
+**Freshness:** Documents have `valid_until` timestamps. Expired docs filtered from search. Stale docs demoted via freshness multiplier (1.0/0.9/0.8 based on age).
+
+**Pipeline:** BullMQ on Railway Redis. Job types: embed, enrich, dedup-check, re-embed, freshness, scrape. Workers are idempotent (safe to retry).
+
+---
+
 ## Key Conventions
 
 - **Import style**: `.js` extensions required (NodeNext module resolution)
