@@ -36,11 +36,10 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Zerox postinstall needs Ghostscript + GraphicsMagick for OCR
-      - name: Install system deps for zerox
-        run: |
-          sudo NEEDRESTART_MODE=a apt-get update -qq
-          sudo NEEDRESTART_MODE=a apt-get install -y -qq ghostscript graphicsmagick > /dev/null 2>&1
+      # Zerox postinstall runs apt-get for Ghostscript/LibreOffice/GraphicsMagick.
+      # needrestart prompts block non-interactive installs, so remove it first.
+      - name: Disable needrestart for zerox postinstall
+        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
 
       - run: npm ci --legacy-peer-deps
 
