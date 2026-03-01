@@ -116,6 +116,34 @@ When flipping env vars on Railway, always check `railway logs` for the startup m
 
 ---
 
+## 2026-03-01 — LiteLLM Gateway + Clerk Auth + Vercel Deploy Gotchas
+
+### What changed
+- LiteLLM gateway fully operational: 7 models (Anthropic, OpenAI, OpenRouter, Together AI)
+- Clerk auth deployed to web (Sign In button) + admin (auth gate) on Vercel
+- Fixed Clerk client-side crash by passing `publishableKey` as server→client prop
+- Fixed LiteLLM Dockerfile COPY paths, health endpoint, model config
+- Set OpenRouter + Together AI API keys on Railway LiteLLM service
+
+### What failed / what worked
+- **Failed:** `vercel redeploy` reuses cached build artifacts — `NEXT_PUBLIC_*` vars from the original build stay inlined in client JS. Setting new env vars then redeploying does NOT update client bundles. Fix: pass the key as a prop from server component (reads env at runtime) to client component.
+- **Failed:** `vercel deploy` from monorepo root with `--cwd apps/web` — `npm ci` runs in subdirectory without `package-lock.json`. Workaround: create temp root `vercel.json` with `installCommand`, `buildCommand`, and `outputDirectory` pointing to the app's `.next/` dir, then swap for each app.
+- **Failed:** Together AI `Meta-Llama-Guard-3-8B` is "non-serverless" — returns error on API call. Upgraded to `Llama-Guard-4-12B` (serverless, newer).
+- **Failed:** Railway CLI `railway variables` truncates display of long values — looks like the key is cut off but the full value IS stored. Don't assume truncation means corruption.
+- **Worked:** LiteLLM `/health/liveliness` for lightweight health checks (avoids `/health` which verifies model connectivity and fails during startup race).
+- **Worked:** `LITELLM_PROXY_URL` ends with `/v1` for OpenAI compat — strip suffix with regex before hitting non-API endpoints (`/health`, `/models`).
+
+### Lesson learned
+`NEXT_PUBLIC_*` env vars are BUILD-TIME only in Next.js. `vercel redeploy` reuses cached build artifacts, so new env vars aren't picked up. Either trigger a fresh build or pass the value as a prop from a server component (which reads env at runtime).
+
+### Validation
+- `curl /api/health` → `{"status":"ok","services":{"database":"ok","redis":"ok","litellm":"ok"}}`
+- All 7 LiteLLM models tested: claude-sonnet, claude-haiku, gpt-4o-mini, text-embedding-3-small, mercury-coder, llamaguard — all return valid responses
+- Web: Clerk "Sign In" button visible, no console errors
+- Admin: Clerk "Admin Access Required" auth gate, no console errors
+
+---
+
 ## Anti-Pattern Registry
 
 > Quick-reference table. Add a row when you discover a new anti-pattern.
@@ -143,3 +171,7 @@ When flipping env vars on Railway, always check `railway logs` for the startup m
 | Assume `railway up` rollover is instant | Old deployment serves for 1-3min after `railway up --detach` | Check `railway logs` for startup message before verifying env var changes | 2026-03-01 |
 | Deploy Vercel via CLI in monorepo | `npm ci` fails — lockfile at root, not app subdir | Use git-triggered deploys only; never `vercel deploy` from CLI | 2026-03-01 |
 | Set Railway env var but forget Vercel `NEXT_PUBLIC_*` | Frontend defaults to localhost, silently fails to load data | Env var checklist: Railway API vars + Vercel `NEXT_PUBLIC_API_URL` + `API_INTERNAL_KEY` | 2026-03-01 |
+| `vercel redeploy` after setting new `NEXT_PUBLIC_*` | Client JS still has old inlined values — crashes or silent bugs | Pass value as server→client prop, OR trigger fresh build (not redeploy) | 2026-03-01 |
+| Use `LITELLM_PROXY_URL` directly for health checks | URL ends with `/v1` — health endpoint is at root, not `/v1/health` | Strip `/v1` suffix before calling `/health/liveliness` | 2026-03-01 |
+| Assume Together AI models are all serverless | "Non-serverless" models return errors without dedicated deployment | Check `/v1/models` endpoint for availability before configuring | 2026-03-01 |
+| Railway Dockerfile `COPY file.yaml` when `RAILWAY_DOCKERFILE_PATH` is set | Build context is repo root, not Dockerfile directory — COPY fails | Use `COPY services/litellm/config.yaml /app/config.yaml` (full path from root) | 2026-03-01 |
