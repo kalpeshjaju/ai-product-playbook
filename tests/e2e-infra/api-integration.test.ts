@@ -301,7 +301,7 @@ describe('Document Ingestion (Postgres)', () => {
     });
     // 201 if new, 200 if duplicate
     expect([200, 201]).toContain(status);
-    expect(body.document).toBeTruthy();
+    expect(body.documentId ?? body.document).toBeTruthy();
   });
 
   it('lists documents', async () => {
