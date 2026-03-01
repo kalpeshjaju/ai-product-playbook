@@ -21,6 +21,8 @@
     "test:e2e": "playwright test",
     "test:e2e:fullstack": "playwright test --config=playwright.e2e.config.ts",
     "test:contract": "vitest run --config vitest.e2e.config.ts",
+    "test:load": "k6 run tests/load/api-load.js",
+    "test:load:smoke": "k6 run --scenario smoke tests/load/api-load.js",
     "dev:local": "bash scripts/dev-local.sh",
     "dev:check": "bash scripts/dev-local.sh --check",
     "storybook": "storybook dev -p 6006",

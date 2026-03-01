@@ -17,6 +17,7 @@ vi.mock('@playbook/shared-llm', () => ({
 }));
 
 import { handleTranscriptionRoutes } from '../src/routes/transcription.js';
+import { scanOutput } from '@playbook/shared-llm';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function createRawMockReq(method: string, body: Buffer): IncomingMessage {
@@ -100,6 +101,29 @@ describe('handleTranscriptionRoutes', () => {
 
     expect(res._statusCode).toBe(502);
     expect(res._body).toContain('Transcription unavailable');
+  });
+
+  // POST /api/transcribe — guardrail blocks transcription
+  it('POST /api/transcribe returns 422 when guardrail blocks output', async () => {
+    const audioBuffer = Buffer.from('fake-audio-data');
+    mockTranscribeAudio.mockResolvedValue({
+      text: 'Some blocked transcription',
+      confidence: 0.9,
+      durationSeconds: 2.0,
+    });
+    vi.mocked(scanOutput).mockResolvedValueOnce({
+      passed: false,
+      findings: [{ scanner: 'regex', category: 'pii_leakage', description: 'PII in transcription', severity: 'high' }],
+      scanTimeMs: 1,
+      scannersRun: ['regex'],
+    });
+
+    const req = createRawMockReq('POST', audioBuffer);
+    const res = createMockRes();
+    await handleTranscriptionRoutes(req, res, '/api/transcribe');
+
+    expect(res._statusCode).toBe(422);
+    expect(res._body).toContain('blocked by output guardrail');
   });
 
   // Unmatched route

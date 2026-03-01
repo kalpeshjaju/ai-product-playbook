@@ -25,6 +25,7 @@ vi.mock('@playbook/shared-llm', () => ({
 }));
 
 import { handleMemoryRoutes } from '../src/routes/memory.js';
+import { scanOutput } from '@playbook/shared-llm';
 
 function createMockReq(method: string): IncomingMessage {
   return { method, headers: {} } as unknown as IncomingMessage;
@@ -141,5 +142,42 @@ describe('handleMemoryRoutes', () => {
     const res = createMockRes();
     await handleMemoryRoutes(req, res, '/api/memory', createBodyParser({}));
     expect(res._statusCode).toBe(404);
+  });
+
+  // ── Guardrail 422 blocks ─────────────────────────────────────────────────
+
+  it('GET /api/memory/search returns 422 when guardrail blocks content', async () => {
+    mockSearch.mockResolvedValue([{
+      entry: { id: 'mem-1', content: 'sensitive data', userId: 'user1', createdAt: '2026-03-01T00:00:00Z' },
+      score: 0.9,
+    }]);
+    vi.mocked(scanOutput).mockResolvedValueOnce({
+      passed: false,
+      findings: [{ scanner: 'regex', category: 'pii_leakage', description: 'PII detected', severity: 'high' }],
+      scanTimeMs: 1,
+      scannersRun: ['regex'],
+    });
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleMemoryRoutes(req, res, '/api/memory/search?q=sensitive&userId=user1', createBodyParser({}));
+    expect(res._statusCode).toBe(422);
+    expect(res._body).toContain('blocked by output guardrail');
+  });
+
+  it('GET /api/memory/:userId returns 422 when guardrail blocks content', async () => {
+    mockGetAll.mockResolvedValue([{ id: 'mem-1', content: 'blocked content' }]);
+    vi.mocked(scanOutput).mockResolvedValueOnce({
+      passed: false,
+      findings: [{ scanner: 'regex', category: 'prompt_injection', description: 'Injection detected', severity: 'critical' }],
+      scanTimeMs: 1,
+      scannersRun: ['regex'],
+    });
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleMemoryRoutes(req, res, '/api/memory/user1', createBodyParser({}));
+    expect(res._statusCode).toBe(422);
+    expect(res._body).toContain('blocked by output guardrail');
   });
 });

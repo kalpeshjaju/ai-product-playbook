@@ -88,6 +88,9 @@ vi.mock('../src/cost-guard.js', () => ({
 }));
 
 import { handleEmbeddingRoutes } from '../src/routes/embeddings.js';
+import { createLLMClient } from '@playbook/shared-llm';
+import { checkTokenBudget } from '../src/rate-limiter.js';
+import { checkCostBudget } from '../src/cost-guard.js';
 
 function createMockReq(method: string): IncomingMessage {
   return { method, headers: {} } as IncomingMessage;
@@ -192,6 +195,77 @@ describe('handleEmbeddingRoutes', () => {
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.id).toBe('emb-uuid-1');
     expect(body.sourceType).toBe('document');
+  });
+
+  // ── GET /api/embeddings/search — success + budget + failure branches ────
+
+  it('GET /api/embeddings/search returns results on success', async () => {
+    const mockExecute = vi.fn().mockResolvedValue([
+      { id: 'emb-1', source_type: 'document', source_id: 'doc-1', similarity: 0.95, metadata: {} },
+    ]);
+    const { db } = await import('../src/db/index.js');
+    db.execute = mockExecute;
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleEmbeddingRoutes(
+      req, res,
+      '/api/embeddings/search?q=test+query&modelId=text-embedding-3-small',
+      createBodyParser({}),
+    );
+    expect(res._statusCode).toBe(200);
+    const body = JSON.parse(res._body) as unknown[];
+    expect(body).toHaveLength(1);
+  });
+
+  it('GET /api/embeddings/search returns 429 when token budget exceeded', async () => {
+    vi.mocked(checkTokenBudget).mockResolvedValueOnce({ allowed: false, limit: 100_000, remaining: 0 });
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleEmbeddingRoutes(
+      req, res,
+      '/api/embeddings/search?q=test&modelId=text-embedding-3-small',
+      createBodyParser({}),
+    );
+    expect(res._statusCode).toBe(429);
+    expect(res._body).toContain('Token budget exceeded');
+  });
+
+  it('GET /api/embeddings/search returns 429 when cost budget exceeded', async () => {
+    vi.mocked(checkTokenBudget).mockResolvedValueOnce({ allowed: true, limit: 100_000, remaining: 99_000 });
+    vi.mocked(checkCostBudget).mockReturnValueOnce({
+      allowed: false,
+      report: { totalCostUSD: 10, totalInputTokens: 0, totalOutputTokens: 0, byAgent: {}, currency: 'USD' },
+    });
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleEmbeddingRoutes(
+      req, res,
+      '/api/embeddings/search?q=test&modelId=text-embedding-3-small',
+      createBodyParser({}),
+    );
+    expect(res._statusCode).toBe(429);
+    expect(res._body).toContain('Cost budget exceeded');
+  });
+
+  it('GET /api/embeddings/search returns 502 when embedding fails', async () => {
+    vi.mocked(createLLMClient).mockReturnValueOnce({
+      embeddings: {
+        create: vi.fn().mockRejectedValue(new Error('LiteLLM down')),
+      },
+    } as unknown as ReturnType<typeof createLLMClient>);
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleEmbeddingRoutes(
+      req, res,
+      '/api/embeddings/search?q=test&modelId=text-embedding-3-small',
+      createBodyParser({}),
+    );
+    expect(res._statusCode).toBe(502);
+    expect(res._body).toContain('Failed to generate query embedding');
   });
 
   // ── 404 fallthrough ──────────────────────────────────────────────────────

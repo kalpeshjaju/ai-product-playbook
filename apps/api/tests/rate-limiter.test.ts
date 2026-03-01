@@ -62,13 +62,39 @@ describe('checkTokenBudget', () => {
     vi.unstubAllEnvs();
   });
 
-  it('fails open when Redis throws an error', async () => {
+  it('fails open when Redis throws an error in dev mode', async () => {
     vi.stubEnv('REDIS_URL', 'redis://localhost:6379');
     const { checkTokenBudget } = await import('../src/rate-limiter.js');
     const { __mockRedis } = await import('ioredis') as unknown as { __mockRedis: { get: ReturnType<typeof vi.fn> } };
     __mockRedis.get.mockRejectedValueOnce(new Error('Connection refused'));
     const result = await checkTokenBudget('user-3', 500);
     expect(result.allowed).toBe(true);
+    expect(result.limit).toBe(100_000);
+    vi.unstubAllEnvs();
+  });
+
+  // ── Production fail-closed behavior ──────────────────────────────────────
+
+  it('blocks requests when Redis unavailable in production (fail-closed)', async () => {
+    vi.stubEnv('REDIS_URL', '');
+    vi.stubEnv('NODE_ENV', 'production');
+    const { checkTokenBudget } = await import('../src/rate-limiter.js');
+    const result = await checkTokenBudget('user-prod', 500);
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.limit).toBe(100_000);
+    vi.unstubAllEnvs();
+  });
+
+  it('blocks requests when Redis throws error in production (fail-closed)', async () => {
+    vi.stubEnv('REDIS_URL', 'redis://localhost:6379');
+    vi.stubEnv('NODE_ENV', 'production');
+    const { checkTokenBudget } = await import('../src/rate-limiter.js');
+    const { __mockRedis } = await import('ioredis') as unknown as { __mockRedis: { get: ReturnType<typeof vi.fn> } };
+    __mockRedis.get.mockRejectedValueOnce(new Error('Redis crashed'));
+    const result = await checkTokenBudget('user-prod-err', 500);
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
     expect(result.limit).toBe(100_000);
     vi.unstubAllEnvs();
   });

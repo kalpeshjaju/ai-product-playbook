@@ -17,6 +17,7 @@ vi.mock('@playbook/shared-llm', () => ({
 }));
 
 import { handleComposioRoutes } from '../src/routes/composio.js';
+import { scanOutput } from '@playbook/shared-llm';
 
 function createMockReq(method: string): IncomingMessage {
   return { method, headers: {} } as unknown as IncomingMessage;
@@ -116,5 +117,30 @@ describe('handleComposioRoutes', () => {
     const res = createMockRes();
     await handleComposioRoutes(req, res, '/api/composio/unknown', createBodyParser({}));
     expect(res._statusCode).toBe(404);
+  });
+
+  // ── Guardrail 422 blocks ─────────────────────────────────────────────────
+
+  it('POST /api/composio/execute returns 422 when guardrail blocks result', async () => {
+    mockExecuteAction.mockResolvedValue({
+      success: true,
+      data: { sensitiveContent: 'blocked' },
+      metadata: { actionName: 'SLACK_SEND', executionTimeMs: 50, noop: false },
+    });
+    vi.mocked(scanOutput).mockResolvedValueOnce({
+      passed: false,
+      findings: [{ scanner: 'regex', category: 'pii_leakage', description: 'PII found in action result', severity: 'high' }],
+      scanTimeMs: 1,
+      scannersRun: ['regex'],
+    });
+
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handleComposioRoutes(req, res, '/api/composio/execute', createBodyParser({
+      action: 'SLACK_SEND',
+      params: { text: 'Hello' },
+    }));
+    expect(res._statusCode).toBe(422);
+    expect(res._body).toContain('blocked by output guardrail');
   });
 });

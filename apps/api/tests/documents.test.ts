@@ -122,7 +122,9 @@ vi.mock('../src/cost-guard.js', () => ({
 }));
 
 import { handleDocumentRoutes } from '../src/routes/documents.js';
-import { isSupportedMimeType } from '@playbook/shared-llm';
+import { isSupportedMimeType, parseDocument } from '@playbook/shared-llm';
+import { checkTokenBudget } from '../src/rate-limiter.js';
+import { checkCostBudget } from '../src/cost-guard.js';
 
 function createMockReq(method: string): IncomingMessage {
   return { method, headers: {} } as IncomingMessage;
@@ -145,6 +147,22 @@ function createMockRes(): ServerResponse & { _body: string; _statusCode: number 
 
 function createBodyParser(body: Record<string, unknown>): (req: IncomingMessage) => Promise<Record<string, unknown>> {
   return () => Promise.resolve(body);
+}
+
+/** Create a mock req that streams raw body data (for /upload routes). */
+function createUploadMockReq(
+  body: Buffer,
+  contentType: string,
+  title = 'Test Upload',
+): IncomingMessage {
+  return {
+    method: 'POST',
+    headers: { 'content-type': contentType, 'x-document-title': title },
+    on(event: string, handler: (...args: unknown[]) => void) {
+      if (event === 'data' && body.length > 0) handler(body);
+      if (event === 'end') handler();
+    },
+  } as unknown as IncomingMessage;
 }
 
 describe('handleDocumentRoutes', () => {
@@ -297,5 +315,112 @@ describe('handleDocumentRoutes', () => {
     await handleDocumentRoutes(req, res, '/api/documents/nonexistent-id', createBodyParser({}));
     expect(res._statusCode).toBe(404);
     expect(res._body).toContain('Document not found');
+  });
+
+  // ── POST /api/documents/upload — branch coverage ─────────────────────────
+
+  it('POST /api/documents/upload returns 400 for empty body', async () => {
+    vi.mocked(isSupportedMimeType).mockReturnValue(true);
+
+    const req = createUploadMockReq(Buffer.alloc(0), 'application/pdf');
+    const res = createMockRes();
+    await handleDocumentRoutes(req, res, '/api/documents/upload', createBodyParser({}));
+    expect(res._statusCode).toBe(400);
+    expect(res._body).toContain('Empty body');
+  });
+
+  it('POST /api/documents/upload returns 502 when parser returns null', async () => {
+    vi.mocked(isSupportedMimeType).mockReturnValue(true);
+    vi.mocked(parseDocument).mockResolvedValue(null);
+
+    const req = createUploadMockReq(Buffer.from('fake-pdf-data'), 'application/pdf');
+    const res = createMockRes();
+    await handleDocumentRoutes(req, res, '/api/documents/upload', createBodyParser({}));
+    expect(res._statusCode).toBe(502);
+    expect(res._body).toContain('Document parsing failed');
+  });
+
+  it('POST /api/documents/upload returns 429 when token budget exceeded', async () => {
+    vi.mocked(isSupportedMimeType).mockReturnValue(true);
+    vi.mocked(parseDocument).mockResolvedValue({ text: 'Parsed content from PDF', pageCount: 1 });
+    vi.mocked(checkTokenBudget).mockResolvedValueOnce({ allowed: false, limit: 100_000, remaining: 0 });
+    // Dedup: no existing doc
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    });
+
+    const req = createUploadMockReq(Buffer.from('pdf-data'), 'application/pdf');
+    const res = createMockRes();
+    await handleDocumentRoutes(req, res, '/api/documents/upload', createBodyParser({}));
+    expect(res._statusCode).toBe(429);
+    expect(res._body).toContain('Token budget exceeded');
+  });
+
+  it('POST /api/documents/upload returns 429 when cost budget exceeded', async () => {
+    vi.mocked(isSupportedMimeType).mockReturnValue(true);
+    vi.mocked(parseDocument).mockResolvedValue({ text: 'Parsed content from PDF', pageCount: 1 });
+    vi.mocked(checkTokenBudget).mockResolvedValueOnce({ allowed: true, limit: 100_000, remaining: 99_000 });
+    vi.mocked(checkCostBudget).mockReturnValueOnce({
+      allowed: false,
+      report: { totalCostUSD: 10, totalInputTokens: 0, totalOutputTokens: 0, byAgent: {}, currency: 'USD' },
+    });
+    // Dedup: no existing doc
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    });
+
+    const req = createUploadMockReq(Buffer.from('pdf-data'), 'application/pdf');
+    const res = createMockRes();
+    await handleDocumentRoutes(req, res, '/api/documents/upload', createBodyParser({}));
+    expect(res._statusCode).toBe(429);
+    expect(res._body).toContain('Cost budget exceeded');
+  });
+
+  // ── POST /api/documents — token/cost budget branches ───────────────────
+
+  it('POST /api/documents returns 429 when token budget exceeded', async () => {
+    vi.mocked(checkTokenBudget).mockResolvedValueOnce({ allowed: false, limit: 100_000, remaining: 0 });
+    // Dedup: no existing doc
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    });
+
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handleDocumentRoutes(
+      req, res, '/api/documents',
+      createBodyParser({ title: 'Budget Test', content: 'Some content' }),
+    );
+    expect(res._statusCode).toBe(429);
+    expect(res._body).toContain('Token budget exceeded');
+  });
+
+  it('POST /api/documents returns 429 when cost budget exceeded', async () => {
+    vi.mocked(checkTokenBudget).mockResolvedValueOnce({ allowed: true, limit: 100_000, remaining: 99_000 });
+    vi.mocked(checkCostBudget).mockReturnValueOnce({
+      allowed: false,
+      report: { totalCostUSD: 10, totalInputTokens: 0, totalOutputTokens: 0, byAgent: {}, currency: 'USD' },
+    });
+    // Dedup: no existing doc
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    });
+
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handleDocumentRoutes(
+      req, res, '/api/documents',
+      createBodyParser({ title: 'Cost Test', content: 'Some content' }),
+    );
+    expect(res._statusCode).toBe(429);
+    expect(res._body).toContain('Cost budget exceeded');
   });
 });
