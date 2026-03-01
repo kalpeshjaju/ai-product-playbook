@@ -53,4 +53,11 @@ export interface ScanConfig {
   enableLlamaGuard?: boolean;
   /** Timeout for the LlamaGuard scanner in ms. Default: 5000. */
   llamaGuardTimeoutMs?: number;
+  /**
+   * Behavior when LlamaGuard is unavailable or errors.
+   * - 'open': swallow errors, continue without semantic scan (old behavior).
+   * - 'closed': treat scanner failure as a critical finding — output is blocked.
+   * Default: 'closed'.
+   */
+  failureMode?: 'open' | 'closed';
 }

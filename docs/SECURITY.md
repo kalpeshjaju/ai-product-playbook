@@ -6,9 +6,10 @@
 ## Dependency Policy
 
 - **Lock files committed**: `package-lock.json` always committed, never `.gitignore`d
-- **Audit on CI**: `npm audit` runs in CI pipeline
+- **Audit on CI**: `npm audit --audit-level high` runs as a blocking gate in the `quality-gates` CI job
 - **No wildcard versions**: Pin exact or range versions in `package.json`
-- **GitGuardian scanning**: Automated secret scanning on every push via `.github/workflows/ci.yml`
+- **GitGuardian scanning**: Automated in CI as a blocking gate (conditional on `GITGUARDIAN_API_KEY` being set)
+- **Semgrep SAST**: `semgrep scan --config=auto --error --severity ERROR` runs as a blocking gate in the `security` CI job
 - **Review new deps**: Every new dependency requires justification (bundle size, maintenance status, license)
 
 ## Secure Coding Rules
@@ -61,7 +62,7 @@ Multi-layer LLM output validation (§14):
 1. **Regex filters** — Block known dangerous patterns (PII, code injection)
 2. **LlamaGuard** — Content safety classification
 3. **Logging** — `guardrail_triggered[]` array stored in `ai_generations` table
-4. **Fail-closed** — If guardrails fail to run, block the response
+4. **Enforcement status** — `scanOutput()` is mandatory on all routes returning LLM/external text (`transcription.ts`, `composio.ts`, `memory.ts`). CI gate `scripts/check-guardrail-usage.sh` enforces this
 
 ## Bot Protection
 

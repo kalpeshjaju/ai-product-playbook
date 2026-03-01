@@ -24,7 +24,8 @@ const SEVERITY_ORDER: Record<GuardrailSeverity, number> = {
  * Scan LLM output through guardrail scanners.
  *
  * Regex scanner always runs (zero deps, sub-ms).
- * LlamaGuard scanner runs when enabled (default: true) — fail-open if unavailable.
+ * LlamaGuard scanner runs when enabled (default: true).
+ * Failure mode (default: 'closed') controls behavior when LlamaGuard errors.
  *
  * @param text - The LLM-generated text to scan
  * @param config - Optional scan configuration
@@ -34,6 +35,7 @@ export async function scanOutput(text: string, config?: ScanConfig): Promise<Gua
   const minSeverity = config?.minSeverity ?? 'low';
   const enableLlamaGuard = config?.enableLlamaGuard ?? true;
   const llamaGuardTimeoutMs = config?.llamaGuardTimeoutMs ?? 5000;
+  const failureMode = config?.failureMode ?? 'closed';
 
   const start = Date.now();
   const allFindings: GuardrailFinding[] = [];
@@ -48,8 +50,21 @@ export async function scanOutput(text: string, config?: ScanConfig): Promise<Gua
   // Optionally run LlamaGuard semantic scanner
   if (enableLlamaGuard) {
     const llamaGuardScanner = new LlamaGuardScanner({ timeoutMs: llamaGuardTimeoutMs });
-    const llamaFindings = await llamaGuardScanner.scan(text);
-    allFindings.push(...llamaFindings);
+    try {
+      const llamaFindings = await llamaGuardScanner.scan(text);
+      allFindings.push(...llamaFindings);
+    } catch (err) {
+      if (failureMode === 'closed') {
+        // Fail-closed: scanner error → block output with critical finding
+        allFindings.push({
+          scanner: llamaGuardScanner.name,
+          category: 'guardrail_unavailable',
+          description: `LlamaGuard scanner unavailable — output blocked (fail-closed). ${err instanceof Error ? err.message : String(err)}`,
+          severity: 'critical',
+        });
+      }
+      // Fail-open: swallow error, continue without semantic scan
+    }
     scannersRun.push(llamaGuardScanner.name);
   }
 

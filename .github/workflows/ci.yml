@@ -72,6 +72,10 @@ jobs:
       - name: Check destructive SQL
         run: bash scripts/check-destructive-sql.sh
 
+      # Guardrail enforcement (§21)
+      - name: Check guardrail usage
+        run: bash scripts/check-guardrail-usage.sh
+
       # API contracts documentation check
       - name: Check API contracts
         run: bash scripts/check-api-contracts.sh
@@ -216,16 +220,28 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
-  # ─── Secret scanning (skipped if GITGUARDIAN_API_KEY not set) ──────
+  # ─── SAST + Secret scanning (blocking gates) ─────────────────────
   security:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: GitGuardian scan
+        if: env.GITGUARDIAN_API_KEY != ''
         uses: GitGuardian/ggshield-action@v1
         env:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Semgrep SAST scan
+        run: semgrep scan --config=auto --error --severity ERROR apps/ packages/ services/
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}

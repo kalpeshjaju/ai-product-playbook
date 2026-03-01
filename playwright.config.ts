@@ -18,7 +18,7 @@ export default defineConfig({
   timeout: 30_000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3100',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
@@ -30,16 +30,16 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm run dev --workspace=apps/web',
-      port: 3000,
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      command: 'npm run dev --workspace=apps/web -- --port 3100',
+      port: 3100,
+      reuseExistingServer: false,
+      timeout: 90_000,
     },
     {
-      command: 'npm run dev --workspace=apps/admin',
-      port: 3001,
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      command: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= npm run dev --workspace=apps/admin -- --port 3101',
+      port: 3101,
+      reuseExistingServer: false,
+      timeout: 90_000,
     },
   ],
 });

@@ -10,15 +10,17 @@
 
 import { test, expect } from '@playwright/test';
 
+const ADMIN_URL = process.env.E2E_ADMIN_URL ?? 'http://localhost:3101';
+
 test.describe('Admin App Smoke Tests', () => {
   test('admin homepage loads with sidebar', async ({ page }) => {
-    await page.goto('http://localhost:3001/');
+    await page.goto(`${ADMIN_URL}/`);
     await expect(page.getByText('Admin')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Memory' })).toBeVisible();
   });
 
   test('memory page loads', async ({ page }) => {
-    await page.goto('http://localhost:3001/memory');
+    await page.goto(`${ADMIN_URL}/memory`);
     await expect(page.getByRole('heading', { name: 'Memory Browser' })).toBeVisible();
   });
 });

@@ -21,20 +21,46 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { sql } from 'drizzle-orm';
 import { db, embeddings } from '../db/index.js';
-import { createLLMClient, createUserContext, withLangfuseHeaders } from '@playbook/shared-llm';
+import { checkTokenBudget } from '../rate-limiter.js';
+import { checkCostBudget } from '../cost-guard.js';
+import { createLLMClient, createUserContext, withLangfuseHeaders, costLedger } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
+/** Rough estimate for input tokens when provider usage metadata is unavailable. */
+function estimateTokens(charCount: number): number {
+  return Math.max(1, Math.ceil(charCount / 4));
+}
+
 /** Embed a query string using the specified model. */
 async function embedQuery(query: string, modelId: string, langfuseHeaders?: Record<string, string>): Promise<number[] | null> {
+  const startedAt = Date.now();
   try {
     const client = createLLMClient(langfuseHeaders ? { headers: langfuseHeaders } : undefined);
     const response = await client.embeddings.create({
       model: modelId,
       input: query,
     });
+
+    const promptTokens = response.usage?.prompt_tokens ?? estimateTokens(query.length);
+    costLedger.recordCall(
+      'embeddings-search',
+      modelId,
+      promptTokens,
+      0,
+      Date.now() - startedAt,
+      true,
+    );
     return response.data[0]?.embedding ?? null;
   } catch {
+    costLedger.recordCall(
+      'embeddings-search',
+      modelId,
+      0,
+      0,
+      Date.now() - startedAt,
+      false,
+    );
     return null;
   }
 }
@@ -66,6 +92,27 @@ export async function handleEmbeddingRoutes(
     if (!modelId) {
       res.statusCode = 400;
       res.end(JSON.stringify({ error: 'Required query param: modelId (§19 HARD GATE: never mix vectors from different models)' }));
+      return;
+    }
+
+    const tokenBudget = await checkTokenBudget(userCtx.userId, estimateTokens(query.length));
+    if (!tokenBudget.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Token budget exceeded',
+        daily_limit: tokenBudget.limit,
+        remaining: tokenBudget.remaining,
+      }));
+      return;
+    }
+
+    const costCheck = checkCostBudget();
+    if (!costCheck.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Cost budget exceeded',
+        report: costCheck.report,
+      }));
       return;
     }
 

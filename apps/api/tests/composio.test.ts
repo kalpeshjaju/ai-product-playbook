@@ -13,6 +13,7 @@ const mockExecuteAction = vi.fn();
 vi.mock('@playbook/shared-llm', () => ({
   getAvailableActions: (...args: unknown[]) => mockGetAvailableActions(...args),
   executeAction: (...args: unknown[]) => mockExecuteAction(...args),
+  scanOutput: vi.fn().mockResolvedValue({ passed: true, findings: [], scanTimeMs: 0, scannersRun: ['regex'] }),
 }));
 
 import { handleComposioRoutes } from '../src/routes/composio.js';

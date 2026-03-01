@@ -15,7 +15,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { transcribeAudio } from '@playbook/shared-llm';
+import { transcribeAudio, scanOutput } from '@playbook/shared-llm';
 
 /** Read raw body as Buffer (not JSON). */
 function readRawBody(req: IncomingMessage): Promise<Buffer> {
@@ -53,6 +53,17 @@ export async function handleTranscriptionRoutes(
     if (!result) {
       res.statusCode = 502;
       res.end(JSON.stringify({ error: 'Transcription unavailable — DEEPGRAM_API_KEY may not be set' }));
+      return;
+    }
+
+    // Guardrail: scan model-generated transcription before returning (§21)
+    const guard = await scanOutput(result.text, { enableLlamaGuard: false });
+    if (!guard.passed) {
+      res.statusCode = 422;
+      res.end(JSON.stringify({
+        error: 'Transcription blocked by output guardrail',
+        findings: guard.findings,
+      }));
       return;
     }
 

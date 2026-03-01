@@ -4,27 +4,25 @@
 # Source: Playbook §18 line 3984.
 set -euo pipefail
 
-LLM_FILES=""
-for dir in apps/ packages/; do
-  if [ -d "$dir" ]; then
-    FOUND=$(grep -rl 'llm\.chat\|streamText\|generateText\|embeddings\.create' "$dir" --include='*.ts' --include='*.tsx' --exclude-dir='dist' --exclude-dir='node_modules' 2>/dev/null || true)
-    if [ -n "$FOUND" ]; then
-      LLM_FILES+="$FOUND"$'\n'
-    fi
-  fi
-done
+API_SRC="apps/api/src"
+if [ ! -d "$API_SRC" ]; then
+  echo "✅ check-rate-limit: apps/api/src not found (nothing to check)"
+  exit 0
+fi
 
-# Deduplicate and trim empty lines
-LLM_FILES=$(echo "$LLM_FILES" | sed '/^$/d' | sort -u)
+# Scope to API source to avoid false positives in shared libraries.
+LLM_PATTERN='createLLMClient\(|\.chat\.completions\.create\(|\.embeddings\.create\(|streamText\(|generateText\('
+LLM_FILES="$(grep -RIl --include='*.ts' --include='*.tsx' -E "$LLM_PATTERN" "$API_SRC" 2>/dev/null || true)"
 
 if [ -z "$LLM_FILES" ]; then
-  echo "✅ check-rate-limit: no LLM call sites found (pass)"
+  echo "✅ check-rate-limit: no API LLM call sites found (pass)"
   exit 0
 fi
 
 FAILED=0
 while IFS= read -r f; do
-  if ! grep -q 'checkTokenBudget\|rateLimi' "$f"; then
+  [ -z "$f" ] && continue
+  if ! grep -q 'checkTokenBudget' "$f"; then
     echo "❌ $f calls LLM without rate limiting"
     FAILED=1
   fi

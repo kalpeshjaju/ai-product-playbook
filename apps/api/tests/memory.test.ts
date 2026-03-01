@@ -21,6 +21,7 @@ vi.mock('@playbook/shared-llm', () => ({
     getAll: mockGetAll,
     delete: mockDeleteMem,
   }),
+  scanOutput: vi.fn().mockResolvedValue({ passed: true, findings: [], scanTimeMs: 0, scannersRun: ['regex'] }),
 }));
 
 import { handleMemoryRoutes } from '../src/routes/memory.js';
@@ -102,7 +103,10 @@ describe('handleMemoryRoutes', () => {
   });
 
   it('GET /api/memory/search returns search results', async () => {
-    mockSearch.mockResolvedValue([{ id: 'mem-1', content: 'dark mode' }]);
+    mockSearch.mockResolvedValue([{
+      entry: { id: 'mem-1', content: 'dark mode', userId: 'user1', createdAt: '2026-03-01T00:00:00Z' },
+      score: 0.95,
+    }]);
 
     const req = createMockReq('GET');
     const res = createMockRes();

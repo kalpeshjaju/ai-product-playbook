@@ -63,6 +63,28 @@ vi.mock('@playbook/shared-llm', () => ({
   createLLMClient: vi.fn().mockReturnValue({
     embeddings: { create: vi.fn().mockResolvedValue({ data: [{ embedding: [0.1, 0.2] }] }) },
   }),
+  costLedger: { recordCall: vi.fn() },
+}));
+
+vi.mock('../src/rate-limiter.js', () => ({
+  checkTokenBudget: vi.fn().mockResolvedValue({
+    allowed: true,
+    limit: 100_000,
+    remaining: 99_000,
+  }),
+}));
+
+vi.mock('../src/cost-guard.js', () => ({
+  checkCostBudget: vi.fn().mockReturnValue({
+    allowed: true,
+    report: {
+      totalCostUSD: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      byAgent: {},
+      currency: 'USD',
+    },
+  }),
 }));
 
 import { handleEmbeddingRoutes } from '../src/routes/embeddings.js';

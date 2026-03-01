@@ -25,7 +25,16 @@ import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { eq, desc } from 'drizzle-orm';
 import { db, documents, embeddings } from '../db/index.js';
-import { createLLMClient, createUserContext, withLangfuseHeaders, parseDocument, isSupportedMimeType } from '@playbook/shared-llm';
+import { checkTokenBudget } from '../rate-limiter.js';
+import { checkCostBudget } from '../cost-guard.js';
+import {
+  createLLMClient,
+  createUserContext,
+  withLangfuseHeaders,
+  parseDocument,
+  isSupportedMimeType,
+  costLedger,
+} from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -35,6 +44,11 @@ const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 /** Configurable chunk defaults. Override per-request or via env vars. */
 const DEFAULT_CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE_CHARS ?? '2000', 10);
 const DEFAULT_CHUNK_OVERLAP = parseInt(process.env.CHUNK_OVERLAP_CHARS ?? '200', 10);
+
+/** Rough estimate for input tokens when provider usage metadata is unavailable. */
+function estimateTokens(charCount: number): number {
+  return Math.max(1, Math.ceil(charCount / 4));
+}
 
 /**
  * Simple recursive character text splitter.
@@ -62,14 +76,34 @@ async function generateEmbeddings(
   modelId: string,
   langfuseHeaders?: Record<string, string>,
 ): Promise<number[][] | null> {
+  const startedAt = Date.now();
   try {
     const client = createLLMClient(langfuseHeaders ? { headers: langfuseHeaders } : undefined);
     const response = await client.embeddings.create({
       model: modelId,
       input: chunks,
     });
+
+    const promptTokens = response.usage?.prompt_tokens
+      ?? estimateTokens(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+    costLedger.recordCall(
+      'documents-embeddings',
+      modelId,
+      promptTokens,
+      0,
+      Date.now() - startedAt,
+      true,
+    );
     return response.data.map((d) => d.embedding);
   } catch {
+    costLedger.recordCall(
+      'documents-embeddings',
+      modelId,
+      0,
+      0,
+      Date.now() - startedAt,
+      false,
+    );
     // Fail-open: if LiteLLM is down, document still stored without embeddings
     return null;
   }
@@ -176,6 +210,28 @@ export async function handleDocumentRoutes(
     }
 
     const chunks = chunkText(parsed.text);
+    const estimatedTokens = estimateTokens(parsed.text.length);
+    const tokenBudget = await checkTokenBudget(userCtx.userId, estimatedTokens);
+    if (!tokenBudget.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Token budget exceeded',
+        daily_limit: tokenBudget.limit,
+        remaining: tokenBudget.remaining,
+      }));
+      return;
+    }
+
+    const costCheck = checkCostBudget();
+    if (!costCheck.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Cost budget exceeded',
+        report: costCheck.report,
+      }));
+      return;
+    }
+
     const embeddingVectors = await generateEmbeddings(chunks, modelId, langfuseHeaders);
     const embeddingSucceeded = embeddingVectors !== null;
 
@@ -247,6 +303,27 @@ export async function handleDocumentRoutes(
 
     // Chunk the content (configurable per-request or via env defaults)
     const chunks = chunkText(content, chunkSize, chunkOverlap);
+    const estimatedTokens = estimateTokens(content.length);
+    const tokenBudget = await checkTokenBudget(userCtx.userId, estimatedTokens);
+    if (!tokenBudget.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Token budget exceeded',
+        daily_limit: tokenBudget.limit,
+        remaining: tokenBudget.remaining,
+      }));
+      return;
+    }
+
+    const costCheck = checkCostBudget();
+    if (!costCheck.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Cost budget exceeded',
+        report: costCheck.report,
+      }));
+      return;
+    }
 
     // Generate embeddings (fail-open)
     const embeddingVectors = await generateEmbeddings(chunks, modelId, langfuseHeaders);

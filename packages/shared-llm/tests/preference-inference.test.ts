@@ -23,7 +23,7 @@ function signal(overrides: Partial<FeedbackSignal> = {}): FeedbackSignal {
   };
 }
 
-describe('inferPreferences', () => {
+describe('inferPreferences thresholds', () => {
   it('returns empty array when signals below minimum evidence count', () => {
     const signals = [signal(), signal(), signal()];
     expect(inferPreferences(signals)).toEqual([]);
@@ -36,7 +36,9 @@ describe('inferPreferences', () => {
   it('returns empty array for single signal', () => {
     expect(inferPreferences([signal()])).toEqual([]);
   });
+});
 
+describe('inferPreferences rules', () => {
   // Rule 1: Model preference — >60% accepted from model X
   it('infers preferred_model when >60% accepted from one model', () => {
     const signals = [
@@ -117,6 +119,9 @@ describe('inferPreferences', () => {
     expect(speedPref).toBeUndefined();
   });
 
+});
+
+describe('inferPreferences composition', () => {
   // Rule 4: Quality preference from thumbs per task type
   it('infers quality preference when avg thumbs > 0.5 for task type', () => {
     const signals = [

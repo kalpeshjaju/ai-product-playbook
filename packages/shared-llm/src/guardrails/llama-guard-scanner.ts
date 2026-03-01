@@ -4,7 +4,7 @@
  * WHY: Regex catches surface patterns; LlamaGuard detects semantic safety issues
  *      (violence, sexual content, criminal advice, self-harm, etc.) that regex misses.
  * HOW: Calls LlamaGuard model through createLLMClient() (LiteLLM proxy).
- *      Fail-open: if LlamaGuard times out or errors, returns zero findings.
+ *      Errors propagate to the caller — failure mode is handled by scanOutput().
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-03-01
@@ -77,9 +77,12 @@ export class LlamaGuardScanner implements GuardrailScanner {
       } finally {
         clearTimeout(timeout);
       }
-    } catch {
-      // Fail-open: LlamaGuard unavailable → no findings
-      return [];
+    } catch (err) {
+      // Let errors propagate — failure mode handled by scanOutput() pipeline
+      throw new Error(
+        `LlamaGuard scanner failed: ${err instanceof Error ? err.message : String(err)}`,
+        { cause: err },
+      );
     }
   }
 

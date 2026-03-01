@@ -17,7 +17,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createMemoryProvider } from '@playbook/shared-llm';
+import { createMemoryProvider, scanOutput } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -46,6 +46,21 @@ export async function handleMemoryRoutes(
       return;
     }
     const results = await memory.search(q, { userId, limit: 10 });
+
+    // Guardrail: scan memory content before returning (§21)
+    const memoryText = results.map(r => r.entry.content).join('\n');
+    if (memoryText.length > 0) {
+      const guard = await scanOutput(memoryText, { enableLlamaGuard: false });
+      if (!guard.passed) {
+        res.statusCode = 422;
+        res.end(JSON.stringify({
+          error: 'Memory content blocked by output guardrail',
+          findings: guard.findings,
+        }));
+        return;
+      }
+    }
+
     res.end(JSON.stringify(results));
     return;
   }
@@ -55,6 +70,21 @@ export async function handleMemoryRoutes(
   if (userMatch && req.method === 'GET') {
     const userId = userMatch[1]!;
     const entries = await memory.getAll(userId);
+
+    // Guardrail: scan memory content before returning (§21)
+    const memoryText = entries.map(e => e.content).join('\n');
+    if (memoryText.length > 0) {
+      const guard = await scanOutput(memoryText, { enableLlamaGuard: false });
+      if (!guard.passed) {
+        res.statusCode = 422;
+        res.end(JSON.stringify({
+          error: 'Memory content blocked by output guardrail',
+          findings: guard.findings,
+        }));
+        return;
+      }
+    }
+
     res.end(JSON.stringify(entries));
     return;
   }

@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { scanOutput } from '../src/guardrails/scanner.js';
 
-// Mock the LlamaGuard scanner to avoid network calls
+// Mock the LlamaGuard scanner to control behavior per test
+const mockScan = vi.fn().mockResolvedValue([]);
+
 vi.mock('../src/guardrails/llama-guard-scanner.js', () => ({
   LlamaGuardScanner: class {
     readonly name = 'llamaguard';
-    async scan(_text: string) {
-      return [];
-    }
+    scan = mockScan;
   },
 }));
 
@@ -29,6 +29,7 @@ describe('scanOutput', () => {
   });
 
   it('runs both regex and llamaguard when enableLlamaGuard is true', async () => {
+    mockScan.mockResolvedValueOnce([]);
     const result = await scanOutput('Safe text', { enableLlamaGuard: true });
     expect(result.scannersRun).toContain('regex');
     expect(result.scannersRun).toContain('llamaguard');
@@ -63,5 +64,50 @@ describe('scanOutput', () => {
     expect(result.passed).toBe(false);
     // SSN (critical) + email (medium) + secret key (critical)
     expect(result.findings.length).toBeGreaterThanOrEqual(3);
+  });
+
+  describe('failureMode', () => {
+    it('fail-closed (default): blocks output when LlamaGuard errors', async () => {
+      mockScan.mockRejectedValueOnce(new Error('Connection refused'));
+      const result = await scanOutput('Safe text', { enableLlamaGuard: true });
+      expect(result.passed).toBe(false);
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0]!.category).toBe('guardrail_unavailable');
+      expect(result.findings[0]!.severity).toBe('critical');
+      expect(result.findings[0]!.description).toContain('Connection refused');
+      expect(result.scannersRun).toContain('llamaguard');
+    });
+
+    it('fail-closed: explicitly set', async () => {
+      mockScan.mockRejectedValueOnce(new Error('Timeout'));
+      const result = await scanOutput('Safe text', {
+        enableLlamaGuard: true,
+        failureMode: 'closed',
+      });
+      expect(result.passed).toBe(false);
+      expect(result.findings[0]!.category).toBe('guardrail_unavailable');
+    });
+
+    it('fail-open: passes output when LlamaGuard errors', async () => {
+      mockScan.mockRejectedValueOnce(new Error('Connection refused'));
+      const result = await scanOutput('Safe text', {
+        enableLlamaGuard: true,
+        failureMode: 'open',
+      });
+      expect(result.passed).toBe(true);
+      expect(result.findings).toHaveLength(0);
+      expect(result.scannersRun).toContain('llamaguard');
+    });
+
+    it('fail-open: regex findings still reported even when LlamaGuard errors', async () => {
+      mockScan.mockRejectedValueOnce(new Error('Service unavailable'));
+      const result = await scanOutput('SSN: 123-45-6789', {
+        enableLlamaGuard: true,
+        failureMode: 'open',
+      });
+      expect(result.passed).toBe(false);
+      expect(result.findings.length).toBeGreaterThan(0);
+      expect(result.findings.every(f => f.scanner === 'regex')).toBe(true);
+    });
   });
 });

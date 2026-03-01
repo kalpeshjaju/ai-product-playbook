@@ -11,7 +11,7 @@
 | `VERCEL_ORG_ID` | deploy-web, deploy-admin | `vercel whoami` or Vercel Dashboard → Settings → General |
 | `VERCEL_WEB_PROJECT_ID` | deploy-web | `cat apps/web/.vercel/project.json` → `projectId` field |
 | `VERCEL_ADMIN_PROJECT_ID` | deploy-admin | `cat apps/admin/.vercel/project.json` → `projectId` field |
-| `RAILWAY_TOKEN` | deploy-api | Railway Dashboard → Project → Settings → Tokens |
+| `RAILWAY_TOKEN` | deploy-api, deploy-litellm | Railway Dashboard → Project → Settings → Tokens |
 
 ## Required for CI Tests
 

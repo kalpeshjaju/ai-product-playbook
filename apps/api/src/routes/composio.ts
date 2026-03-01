@@ -15,7 +15,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { getAvailableActions, executeAction } from '@playbook/shared-llm';
+import { getAvailableActions, executeAction, scanOutput } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -51,6 +51,24 @@ export async function handleComposioRoutes(
       return;
     }
     const result = await executeAction(action, params, body.entityId as string | undefined);
+
+    // Guardrail: scan external action result for unsafe content (§21)
+    const textToScan = typeof result.data === 'object'
+      ? JSON.stringify(result.data)
+      : String(result.data ?? '');
+    if (textToScan.length > 0) {
+      const guard = await scanOutput(textToScan, { enableLlamaGuard: false });
+      if (!guard.passed) {
+        res.statusCode = 422;
+        res.end(JSON.stringify({
+          error: 'Action result blocked by output guardrail',
+          findings: guard.findings,
+          actionName: action,
+        }));
+        return;
+      }
+    }
+
     res.end(JSON.stringify(result));
     return;
   }

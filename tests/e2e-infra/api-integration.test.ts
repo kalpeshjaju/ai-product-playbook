@@ -1,7 +1,7 @@
 /**
  * FILE PURPOSE: API contract tests against real Postgres + Redis
  *
- * WHY: Unit tests mock everything. These 35 tests hit a real API server
+ * WHY: Unit tests mock everything. These contract tests hit a real API server
  *      backed by Postgres+pgvector and Redis to catch: schema drift,
  *      missing extensions, auth failures, response shape changes.
  *
@@ -175,6 +175,25 @@ describe('Prompt Versioning (Postgres)', () => {
     const { status } = await get('/api/prompts/definitely-does-not-exist/active');
     expect(status).toBe(404);
   });
+
+  it('promotes a prompt version through the ladder', async () => {
+    // First set traffic to 0% to reset
+    await patch(`/api/prompts/${createdId}/traffic`, { active_pct: 0 });
+    // Promote: 0% → 10%
+    const { status, body } = await post(`/api/prompts/${testPromptName}/promote`, {
+      version: 'v1.0.0',
+    });
+    expect(status).toBe(200);
+    expect(body.previousPct).toBe(0);
+    expect(body.newPct).toBe(10);
+    expect(body.nextStep).toBeTypeOf('string');
+  });
+
+  it('rejects promote without version', async () => {
+    const { status, body } = await post(`/api/prompts/${testPromptName}/promote`, {});
+    expect(status).toBe(400);
+    expect(body.error).toContain('version');
+  });
 });
 
 // ─── Generation Logging ────────────────────────────────────────
@@ -256,6 +275,13 @@ describe('Cost Observability', () => {
     expect(body).toHaveProperty('totalCostUSD');
     expect(body).toHaveProperty('byAgent');
   });
+
+  it('resets cost counters (admin-only)', async () => {
+    const { status, body } = await post('/api/costs/reset', {});
+    expect(status).toBe(200);
+    expect(body.status).toBe('reset');
+    expect(body).toHaveProperty('report');
+  });
 });
 
 // ─── Document Ingestion ────────────────────────────────────────
@@ -276,6 +302,22 @@ describe('Document Ingestion (Postgres)', () => {
     const { status, body } = await get('/api/documents');
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('returns 404 for non-existent document ID', async () => {
+    const { status, body } = await get('/api/documents/00000000-0000-0000-0000-000000000000');
+    expect(status).toBe(404);
+    expect(body.error).toContain('not found');
+  });
+
+  it('rejects upload with unsupported content-type', async () => {
+    const { status, body } = await postRaw(
+      '/api/documents/upload',
+      Buffer.from('not a real file'),
+      'application/octet-stream',
+    );
+    expect(status).toBe(400);
+    expect(body.error).toContain('Unsupported Content-Type');
   });
 });
 
@@ -301,14 +343,39 @@ describe('Static Data Routes', () => {
 
 // ─── Memory Routes (fail-open) ─────────────────────────────────
 
-describe('Memory Routes', () => {
-  it('returns response (either data or disabled message)', async () => {
+describe('Memory Routes (fail-open)', () => {
+  it('GET /:userId returns response (data or disabled)', async () => {
     const { status, body } = await get('/api/memory/test-user');
-    // Memory provider may not be configured — both responses are valid
     expect([200]).toContain(status);
-    // Either an array of memories or { enabled: false }
     expect(
       Array.isArray(body) || (body as Record<string, unknown>).enabled === false
+    ).toBe(true);
+  });
+
+  it('POST / returns response (created or disabled)', async () => {
+    const { status, body } = await post('/api/memory', {
+      content: 'Test memory for E2E',
+      userId: 'e2e-test-user',
+    });
+    expect([200, 201]).toContain(status);
+    expect(
+      body.id !== undefined || (body as Record<string, unknown>).enabled === false
+    ).toBe(true);
+  });
+
+  it('GET /search returns response (results or disabled)', async () => {
+    const { status, body } = await get('/api/memory/search?q=test&userId=e2e-test-user');
+    expect([200]).toContain(status);
+    expect(
+      Array.isArray(body) || (body as Record<string, unknown>).enabled === false
+    ).toBe(true);
+  });
+
+  it('DELETE /:id returns response (deleted or disabled)', async () => {
+    const { status, body } = await del('/api/memory/fake-memory-id');
+    expect([200]).toContain(status);
+    expect(
+      body.deleted !== undefined || (body as Record<string, unknown>).enabled === false
     ).toBe(true);
   });
 });
@@ -364,6 +431,13 @@ describe('User Preferences (Postgres)', () => {
     const { status } = await del(`/api/preferences/${testUserId}/nonexistent-key`);
     expect(status).toBe(404);
   });
+
+  it('triggers preference inference from feedback', async () => {
+    const { status, body } = await post(`/api/preferences/${testUserId}/infer`, {});
+    expect(status).toBe(200);
+    expect(body.inferred).toBeTypeOf('number');
+    expect(Array.isArray(body.preferences)).toBe(true);
+  });
 });
 
 // ─── Few-Shot Bank CRUD ────────────────────────────────────────
@@ -416,6 +490,20 @@ describe('Few-Shot Bank (Postgres)', () => {
     expect(status).toBe(200);
     expect(body.deactivated).toBe(createdId);
   });
+
+  it('auto-curates from top generations (build)', async () => {
+    const { status, body } = await post('/api/few-shot/build', { taskType });
+    expect(status).toBe(200);
+    expect(body.taskType).toBe(taskType);
+    expect(body.candidatesFound).toBeTypeOf('number');
+    expect(body.added).toBeTypeOf('number');
+  });
+
+  it('rejects build without taskType', async () => {
+    const { status, body } = await post('/api/few-shot/build', {});
+    expect(status).toBe(400);
+    expect(body.error).toContain('taskType');
+  });
 });
 
 // ─── Embedding Routes (validation) ────────────────────────────
@@ -446,16 +534,26 @@ describe('Embedding Routes (validation)', () => {
 // ─── Composio Routes (fail-open) ──────────────────────────────
 
 describe('Composio Routes (fail-open)', () => {
-  it('returns deterministic response based on API key presence', async () => {
+  it('GET /actions returns deterministic response', async () => {
     const { status, body } = await get('/api/composio/actions');
     expect(status).toBe(200);
     if (process.env.COMPOSIO_API_KEY) {
-      // Key present — route should be enabled
       expect(body.enabled).not.toBe(false);
     } else {
-      // No key — should fail-open with disabled message
       expect(body.enabled).toBe(false);
       expect(body.message).toContain('COMPOSIO_API_KEY');
+    }
+  });
+
+  it('POST /execute returns disabled or requires params', async () => {
+    const { status, body } = await post('/api/composio/execute', {});
+    if (!process.env.COMPOSIO_API_KEY) {
+      expect(status).toBe(200);
+      expect(body.enabled).toBe(false);
+    } else {
+      // Key present — should require action and params
+      expect(status).toBe(400);
+      expect(body.error).toContain('action');
     }
   });
 });
@@ -463,16 +561,36 @@ describe('Composio Routes (fail-open)', () => {
 // ─── OpenPipe Routes (fail-open) ──────────────────────────────
 
 describe('OpenPipe Routes (fail-open)', () => {
-  it('returns deterministic response based on API key presence', async () => {
+  it('GET /finetune/:jobId returns disabled or job status', async () => {
     const { status, body } = await get('/api/openpipe/finetune/test-job');
     expect(status).toBe(200);
     if (process.env.OPENPIPE_API_KEY) {
-      // Key present — route should be enabled
       expect(body.enabled).not.toBe(false);
     } else {
-      // No key — should fail-open with disabled message
       expect(body.enabled).toBe(false);
       expect(body.message).toContain('OPENPIPE_API_KEY');
+    }
+  });
+
+  it('POST /log returns disabled or requires messages', async () => {
+    const { status, body } = await post('/api/openpipe/log', {});
+    if (!process.env.OPENPIPE_API_KEY) {
+      expect(status).toBe(200);
+      expect(body.enabled).toBe(false);
+    } else {
+      expect(status).toBe(400);
+      expect(body.error).toContain('messages');
+    }
+  });
+
+  it('POST /finetune returns disabled or requires baseModel', async () => {
+    const { status, body } = await post('/api/openpipe/finetune', {});
+    if (!process.env.OPENPIPE_API_KEY) {
+      expect(status).toBe(200);
+      expect(body.enabled).toBe(false);
+    } else {
+      expect(status).toBe(400);
+      expect(body.error).toContain('baseModel');
     }
   });
 });

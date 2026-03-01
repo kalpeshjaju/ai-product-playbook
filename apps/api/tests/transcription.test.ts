@@ -13,6 +13,7 @@ const mockTranscribeAudio = vi.fn();
 
 vi.mock('@playbook/shared-llm', () => ({
   transcribeAudio: (...args: unknown[]) => mockTranscribeAudio(...args),
+  scanOutput: vi.fn().mockResolvedValue({ passed: true, findings: [], scanTimeMs: 0, scannersRun: ['regex'] }),
 }));
 
 import { handleTranscriptionRoutes } from '../src/routes/transcription.js';
