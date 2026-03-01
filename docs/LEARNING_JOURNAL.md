@@ -25,6 +25,28 @@
 
 ---
 
+## 2026-03-01: CI Hardening + Tier 2 Docs + Braintrust Eval + Prompt Promotion + Full Deploy
+
+**What happened**: Closed 4 Tier 2 gaps: rewrote 3 stub CI scripts to real blocking gates, created 4 docs (ARCHITECTURE, DATA_MODEL, API_CONTRACTS, SECURITY), rewrote Braintrust eval with SDK + dataset, added prompt promotion ladder (0→10→50→100%). Fixed all API type-check errors (11→0). Provisioned Railway services (PostgreSQL, Redis, LiteLLM), set 16 GitHub secrets, wired env vars across Railway/Vercel, deployed API + LiteLLM to production.
+
+**What worked**:
+- Reading all files before editing — avoided hallucinating Drizzle APIs
+- Running `check-api-contracts.sh` iteratively to debug regex extraction (3 rounds to get it right)
+- Using Railway variable references (`${{Postgres.DATABASE_URL}}`) for cross-service wiring
+- Creating tables via raw SQL when `drizzle-kit push` failed due to missing pgvector extension
+
+**What failed**:
+- **Drizzle double `.where()` chaining** — silently compiles but fails type-check. Fix: use `and()` for compound conditions
+- **ioredis default import** — `import Redis from 'ioredis'` creates a namespace, not a class. Fix: `import { Redis } from 'ioredis'`
+- **pgvector not available** on Railway's default PostgreSQL image. Workaround: created prompt_versions + ai_generations directly, deferred embeddings table
+- **check-api-contracts.sh regex extraction** picked up non-route regexes (version patterns). Fix: filter to only patterns containing `/api/`, use Python for reliable regex parsing over sed
+
+**Lesson learned**: Railway's default PostgreSQL doesn't bundle pgvector. Plan for a custom Docker image or Supabase if vector search is a hard requirement. Also: shell scripts that parse regex from source code are fragile — use Python for anything beyond simple grep.
+
+**Next time**: For CI gate scripts that parse source code, write a quick test case before wiring to CI. Would have caught the regex false positives earlier.
+
+---
+
 <!-- Add entries as work happens. Format:
 
 ## YYYY-MM-DD: [Task Name]
@@ -55,3 +77,7 @@
 | Process findings in arbitrary order under timeout | Critical issues get dropped | Sort by severity before truncating | 2026-02-28 |
 | Track cost at one layer only | Missing either billing truth or attribution truth | Dual-layer: provider + agent | 2026-02-28 |
 | No fallback rate monitoring | Silent degradation hidden by resilience patterns | Track primary vs fallback invocation rates | 2026-02-28 |
+| Chain `.where().where()` in Drizzle | Compiles but fails type-check; second where ignored at runtime | Use `and()` for compound conditions | 2026-03-01 |
+| `import Redis from 'ioredis'` with NodeNext | Namespace import, not constructable class | Use `import { Redis } from 'ioredis'` | 2026-03-01 |
+| Assume Railway PostgreSQL has pgvector | Extension not available on default image | Create tables without vector type, or use custom Postgres image | 2026-03-01 |
+| Parse source code regexes with sed/grep | Slashes in regex break sed delimiters, false positives | Use Python for regex extraction from source code | 2026-03-01 |
