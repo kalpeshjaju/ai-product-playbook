@@ -143,7 +143,9 @@ const server = createServer(async (req, res) => {
         const healthHeaders: Record<string, string> = {};
         const litellmKey = process.env.LITELLM_API_KEY;
         if (litellmKey) healthHeaders['Authorization'] = `Bearer ${litellmKey}`;
-        const litellmRes = await fetch(`${baseUrl}/health`, { signal: controller.signal, headers: healthHeaders });
+        // Use /health/liveliness — lightweight check that the proxy is running.
+        // /health tries to verify model connectivity and fails during startup race conditions.
+        const litellmRes = await fetch(`${baseUrl}/health/liveliness`, { signal: controller.signal, headers: healthHeaders });
         clearTimeout(timer);
         litellmStatus = litellmRes.ok ? 'ok' : 'unreachable';
       } catch {
