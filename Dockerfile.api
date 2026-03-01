@@ -12,8 +12,9 @@ COPY apps/api/package.json apps/api/tsconfig.json apps/api/drizzle.config.ts app
 COPY packages/shared-types/package.json packages/shared-types/tsconfig.json packages/shared-types/
 COPY packages/shared-llm/package.json packages/shared-llm/tsconfig.json packages/shared-llm/
 
-# Install dependencies (deterministic install)
-RUN npm ci --legacy-peer-deps
+# Install dependencies — skip postinstall scripts (zerox tries to apt-get
+# install Ghostscript/LibreOffice which isn't needed for the API server)
+RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # Copy source code
 COPY packages/shared-types/src/ packages/shared-types/src/
