@@ -71,7 +71,7 @@ export async function handleFeedbackRoutes(
       return;
     }
 
-    if (generation.userId !== authenticatedUserId) {
+    if (generation.userId !== authenticatedUserId && authResult.tier !== 'admin') {
       res.statusCode = 403;
       res.end(JSON.stringify({ error: 'Forbidden: you can only add outcomes to your own generations' }));
       return;
@@ -138,7 +138,7 @@ export async function handleFeedbackRoutes(
       return;
     }
 
-    if (existing.userId !== authenticatedUserId) {
+    if (existing.userId !== authenticatedUserId && authResult.tier !== 'admin') {
       res.statusCode = 403;
       res.end(JSON.stringify({ error: 'Forbidden: you can only update feedback on your own generations' }));
       return;

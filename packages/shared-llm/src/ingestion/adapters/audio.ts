@@ -54,7 +54,7 @@ export class AudioIngester implements Ingester {
             'Authorization': `Token ${apiKey}`,
             'Content-Type': mimeType,
           },
-          body: content,
+          body: new Uint8Array(content),
         });
 
         if (!response.ok && !isRetryableStatus(response.status)) return null;

@@ -150,6 +150,8 @@ describe('Prompt Versioning (Postgres)', () => {
   });
 
   it('retrieves the active prompt version', async () => {
+    // New prompts default to activePct=0; must set traffic first
+    await patch(`/api/prompts/${createdId}/traffic`, { active_pct: 100 });
     const { status, body } = await get(`/api/prompts/${testPromptName}/active`);
     expect(status).toBe(200);
     expect(body.prompt_name).toBe(testPromptName);
