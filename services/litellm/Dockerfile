@@ -6,5 +6,8 @@ COPY config.yaml /app/config.yaml
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
+# Run as non-root (Semgrep: missing-user-entrypoint)
+USER nobody
+
 ENTRYPOINT []
 CMD ["/bin/sh", "/app/start.sh"]

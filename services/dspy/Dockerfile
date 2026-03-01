@@ -16,4 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Run as non-root (Semgrep: missing-user-entrypoint)
+RUN adduser --disabled-password --gecos '' appuser
+USER appuser
+
 ENTRYPOINT ["python", "optimize.py"]
