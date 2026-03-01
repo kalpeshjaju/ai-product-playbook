@@ -27,6 +27,13 @@ const VALID_FEEDBACK = ['accepted', 'rejected', 'edited', 'regenerated', 'ignore
 const VALID_THUMBS = [-1, 0, 1] as const;
 const VALID_OUTCOME_TYPES = ['conversion', 'task_completed', 'abandoned'] as const;
 
+/** Check if the caller provided a valid admin key (bypass IDOR). */
+function isAdminCaller(req: IncomingMessage): boolean {
+  const adminKey = process.env.ADMIN_API_KEY;
+  if (!adminKey) return false;
+  return req.headers['x-admin-key'] === adminKey;
+}
+
 export async function handleFeedbackRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -71,7 +78,7 @@ export async function handleFeedbackRoutes(
       return;
     }
 
-    if (generation.userId !== authenticatedUserId && authResult.tier !== 'admin') {
+    if (generation.userId !== authenticatedUserId && !isAdminCaller(req)) {
       res.statusCode = 403;
       res.end(JSON.stringify({ error: 'Forbidden: you can only add outcomes to your own generations' }));
       return;
@@ -138,7 +145,7 @@ export async function handleFeedbackRoutes(
       return;
     }
 
-    if (existing.userId !== authenticatedUserId && authResult.tier !== 'admin') {
+    if (existing.userId !== authenticatedUserId && !isAdminCaller(req)) {
       res.statusCode = 403;
       res.end(JSON.stringify({ error: 'Forbidden: you can only update feedback on your own generations' }));
       return;
