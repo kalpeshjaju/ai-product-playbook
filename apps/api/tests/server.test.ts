@@ -29,8 +29,10 @@ vi.mock('../src/middleware/auth.js', () => ({
   authenticateRequest: vi.fn().mockReturnValue({
     userContext: { userId: 'test-user', source: 'api_key' },
     tier: 'user',
+    authMethod: 'api-key',
   }),
   verifyUserOwnership: vi.fn().mockReturnValue(true),
+  validateAuthConfig: vi.fn(),
 }));
 
 vi.mock('../src/middleware/posthog.js', () => ({

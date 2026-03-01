@@ -11,6 +11,7 @@
 export {
   createUserContext,
   createUserContextFromValues,
+  hashApiKey,
   withLangfuseHeaders,
 } from './context.js';
 export type { RequestLike } from './context.js';

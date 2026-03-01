@@ -87,6 +87,7 @@ export type { GenerationLogInput, GenerationLogRecord } from './generation-logge
 export {
   createUserContext,
   createUserContextFromValues,
+  hashApiKey,
   withLangfuseHeaders,
 } from './identity/index.js';
 export type { RequestLike, UserContext, LangfuseHeaders } from './identity/index.js';

@@ -93,6 +93,16 @@ vi.mock('@playbook/shared-llm', () => ({
 }));
 
 import { handleGenerationRoutes } from '../src/routes/generations.js';
+import type { AuthResult } from '../src/middleware/auth.js';
+
+/** Default auth result for tests (authenticated via api-key). */
+function createMockAuth(userId = 'user-1'): AuthResult {
+  return {
+    userContext: { userId, source: 'api_key' },
+    tier: 'user',
+    authMethod: 'api-key',
+  };
+}
 
 /** Helper: builds a complete valid generation body with all required fields. */
 function validGenerationBody(): Record<string, unknown> {
@@ -147,6 +157,7 @@ describe('handleGenerationRoutes', () => {
     await handleGenerationRoutes(
       req, res, '/api/generations',
       createBodyParser({ userId: 'user-1', promptText: 'hello' }),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Required field missing');
@@ -158,7 +169,7 @@ describe('handleGenerationRoutes', () => {
 
     const req = createMockReq('POST');
     const res = createMockRes();
-    await handleGenerationRoutes(req, res, '/api/generations', createBodyParser(body));
+    await handleGenerationRoutes(req, res, '/api/generations', createBodyParser(body), createMockAuth());
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('model');
   });
@@ -181,6 +192,7 @@ describe('handleGenerationRoutes', () => {
     await handleGenerationRoutes(
       req, res, '/api/generations',
       createBodyParser(validGenerationBody()),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(201);
     const body = JSON.parse(res._body) as Record<string, unknown>;
@@ -192,7 +204,7 @@ describe('handleGenerationRoutes', () => {
   it('GET /api/generations returns 400 when userId is missing', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    await handleGenerationRoutes(req, res, '/api/generations', createBodyParser({}));
+    await handleGenerationRoutes(req, res, '/api/generations', createBodyParser({}), createMockAuth());
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('userId');
   });
@@ -216,6 +228,7 @@ describe('handleGenerationRoutes', () => {
     await handleGenerationRoutes(
       req, res, '/api/generations?userId=user-1&limit=10&offset=0',
       createBodyParser({}),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(200);
     const body = JSON.parse(res._body) as unknown[];
@@ -227,7 +240,7 @@ describe('handleGenerationRoutes', () => {
   it('GET /api/generations/stats returns 400 when userId is missing', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    await handleGenerationRoutes(req, res, '/api/generations/stats', createBodyParser({}));
+    await handleGenerationRoutes(req, res, '/api/generations/stats', createBodyParser({}), createMockAuth());
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('userId');
   });
@@ -250,6 +263,7 @@ describe('handleGenerationRoutes', () => {
     await handleGenerationRoutes(
       req, res, '/api/generations/stats?userId=user-1&days=7',
       createBodyParser({}),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(200);
     const body = JSON.parse(res._body) as Record<string, unknown>;
@@ -264,7 +278,7 @@ describe('handleGenerationRoutes', () => {
   it('returns 404 for unmatched generation routes', async () => {
     const req = createMockReq('DELETE');
     const res = createMockRes();
-    await handleGenerationRoutes(req, res, '/api/generations', createBodyParser({}));
+    await handleGenerationRoutes(req, res, '/api/generations', createBodyParser({}), createMockAuth());
     expect(res._statusCode).toBe(404);
   });
 });

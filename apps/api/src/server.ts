@@ -31,7 +31,7 @@ import { handleFewShotRoutes } from './routes/few-shot.js';
 import { handleEntryRoutes } from './routes/entries.js';
 import { handleUserRoutes } from './routes/users.js';
 import { handleIngestRoutes } from './routes/ingest.js';
-import { authenticateRequest, verifyUserOwnership } from './middleware/auth.js';
+import { authenticateRequest, verifyUserOwnership, validateAuthConfig } from './middleware/auth.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 import { db } from './db/index.js';
 import { closeDatabase } from './db/connection.js';
@@ -50,6 +50,9 @@ if (sentryDsn) {
 
 // PostHog server-side — no-op when POSTHOG_SERVER_API_KEY not set
 initPostHogServer();
+
+// Validate auth configuration before accepting requests
+validateAuthConfig();
 
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
 const startTime = Date.now();
@@ -168,7 +171,8 @@ const server = createServer(async (req, res) => {
   if (!authResult) return; // 401/403 already sent
 
   // ─── IDOR prevention (user-scoped routes) ───
-  if (authResult.tier === 'user') {
+  // Skip IDOR check only when AUTH_MODE=open (no real identity to verify)
+  if (authResult.tier === 'user' && authResult.authMethod !== 'none') {
     if (!verifyUserOwnership(url, authResult.userContext.userId)) {
       res.statusCode = 403;
       res.end(JSON.stringify({
@@ -251,7 +255,7 @@ const server = createServer(async (req, res) => {
 
   // ─── AI Generation logging (§21 Plane 3) ───
   if (url.startsWith('/api/generations')) {
-    await handleGenerationRoutes(req, res, url, parseBody);
+    await handleGenerationRoutes(req, res, url, parseBody, authResult);
     return;
   }
 
@@ -269,7 +273,7 @@ const server = createServer(async (req, res) => {
 
   // ─── Embedding search (§19) ───
   if (url.startsWith('/api/embeddings')) {
-    await handleEmbeddingRoutes(req, res, url, parseBody);
+    await handleEmbeddingRoutes(req, res, url, parseBody, authResult);
     return;
   }
 

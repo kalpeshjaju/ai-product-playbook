@@ -23,7 +23,8 @@ import { sql } from 'drizzle-orm';
 import { db, embeddings } from '../db/index.js';
 import { checkTokenBudget } from '../rate-limiter.js';
 import { checkCostBudget } from '../cost-guard.js';
-import { createLLMClient, createUserContext, withLangfuseHeaders, costLedger } from '@playbook/shared-llm';
+import { createLLMClient, withLangfuseHeaders, costLedger } from '@playbook/shared-llm';
+import type { AuthResult } from '../middleware/auth.js';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -70,10 +71,11 @@ export async function handleEmbeddingRoutes(
   res: ServerResponse,
   url: string,
   parseBody: BodyParser,
+  authResult: AuthResult,
 ): Promise<void> {
   try {
   const parsedUrl = new URL(url, 'http://localhost');
-  const userCtx = createUserContext(req);
+  const userCtx = authResult.userContext;
   const langfuseHeaders: Record<string, string> = { ...withLangfuseHeaders(userCtx) };
 
   // GET /api/embeddings/search?q=...&limit=10&modelId=...

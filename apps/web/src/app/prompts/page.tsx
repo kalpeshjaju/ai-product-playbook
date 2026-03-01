@@ -6,8 +6,7 @@
  */
 
 import type { PromptVersion } from '@playbook/shared-types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+import { API_URL, getApiHeaders } from '../../lib/api';
 
 const PROMPT_NAMES = ['job-classifier', 'resume-parser', 'synthesis'];
 
@@ -21,7 +20,7 @@ async function getActivePrompts(): Promise<ActivePrompt[]> {
   const results: ActivePrompt[] = [];
   for (const name of PROMPT_NAMES) {
     try {
-      const res = await fetch(`${API_URL}/api/prompts/${name}/active`, { cache: 'no-store' });
+      const res = await fetch(`${API_URL}/api/prompts/${name}/active`, { cache: 'no-store', headers: getApiHeaders() });
       if (res.ok) {
         const data = await res.json() as PromptVersion;
         results.push({ name, version: data });

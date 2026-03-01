@@ -21,6 +21,7 @@ import { eq, desc, sql, and, gte } from 'drizzle-orm';
 import { db, aiGenerations } from '../db/index.js';
 import { createGenerationLog } from '@playbook/shared-llm';
 import type { GenerationLogInput } from '@playbook/shared-llm';
+import type { AuthResult } from '../middleware/auth.js';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -62,6 +63,7 @@ export async function handleGenerationRoutes(
   res: ServerResponse,
   url: string,
   parseBody: BodyParser,
+  authResult: AuthResult,
 ): Promise<void> {
   try {
   const parsedUrl = new URL(url, 'http://localhost');
@@ -135,6 +137,14 @@ export async function handleGenerationRoutes(
       res.statusCode = 400;
       res.end(JSON.stringify({ error: validated }));
       return;
+    }
+
+    // Override body.userId with authenticated identity (prevent IDOR on writes)
+    if (authResult.authMethod !== 'none' && validated.userId !== authResult.userContext.userId) {
+      process.stderr.write(
+        `WARN: generation POST body.userId="${validated.userId}" overridden by auth userId="${authResult.userContext.userId}"\n`,
+      );
+      validated.userId = authResult.userContext.userId;
     }
 
     const record = createGenerationLog(validated);

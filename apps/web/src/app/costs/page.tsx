@@ -6,8 +6,7 @@
  */
 
 import { DataCard } from '@playbook/shared-ui';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+import { API_URL, getApiHeaders } from '../../lib/api';
 
 interface AgentCost {
   input: number;
@@ -39,7 +38,7 @@ interface CostReport {
 
 async function getCosts(): Promise<CostReport | null> {
   try {
-    const res = await fetch(`${API_URL}/api/costs`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/api/costs`, { cache: 'no-store', headers: getApiHeaders() });
     if (!res.ok) return null;
     return await res.json() as CostReport;
   } catch {

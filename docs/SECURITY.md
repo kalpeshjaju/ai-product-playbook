@@ -6,7 +6,7 @@
 ## Dependency Policy
 
 - **Lock files committed**: `package-lock.json` always committed, never `.gitignore`d
-- **Audit on CI**: `npm audit --audit-level high` runs as a blocking gate in the `quality-gates` CI job
+- **Audit on CI**: `scripts/audit-with-allowlist.js` runs as a blocking gate — unfixable vulns in `.audit-allowlist.json` with expiry dates
 - **No wildcard versions**: Pin exact or range versions in `package.json`
 - **GitGuardian scanning**: Automated in CI as a blocking gate (conditional on `GITGUARDIAN_API_KEY` being set)
 - **Semgrep SAST**: `semgrep scan --config=auto --error --severity ERROR` runs as a blocking gate in the `security` CI job

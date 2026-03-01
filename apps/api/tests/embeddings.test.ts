@@ -91,6 +91,16 @@ import { handleEmbeddingRoutes } from '../src/routes/embeddings.js';
 import { createLLMClient } from '@playbook/shared-llm';
 import { checkTokenBudget } from '../src/rate-limiter.js';
 import { checkCostBudget } from '../src/cost-guard.js';
+import type { AuthResult } from '../src/middleware/auth.js';
+
+/** Default auth result for tests. */
+function createMockAuth(userId = 'test-user'): AuthResult {
+  return {
+    userContext: { userId, source: 'ip' },
+    tier: 'user',
+    authMethod: 'api-key',
+  };
+}
 
 function createMockReq(method: string): IncomingMessage {
   return { method, headers: {} } as IncomingMessage;
@@ -125,7 +135,7 @@ describe('handleEmbeddingRoutes', () => {
   it('GET /api/embeddings/search returns 400 when q param is missing', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    await handleEmbeddingRoutes(req, res, '/api/embeddings/search?modelId=text-embedding-3-small', createBodyParser({}));
+    await handleEmbeddingRoutes(req, res, '/api/embeddings/search?modelId=text-embedding-3-small', createBodyParser({}), createMockAuth());
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Required query param: q');
   });
@@ -133,7 +143,7 @@ describe('handleEmbeddingRoutes', () => {
   it('GET /api/embeddings/search returns 400 when modelId is missing (§19 HARD GATE)', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    await handleEmbeddingRoutes(req, res, '/api/embeddings/search?q=test+query', createBodyParser({}));
+    await handleEmbeddingRoutes(req, res, '/api/embeddings/search?q=test+query', createBodyParser({}), createMockAuth());
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('modelId');
     expect(res._body).toContain('HARD GATE');
@@ -147,6 +157,7 @@ describe('handleEmbeddingRoutes', () => {
     await handleEmbeddingRoutes(
       req, res, '/api/embeddings',
       createBodyParser({ sourceType: 'document', sourceId: 'doc-1' }),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Required');
@@ -158,6 +169,7 @@ describe('handleEmbeddingRoutes', () => {
     await handleEmbeddingRoutes(
       req, res, '/api/embeddings',
       createBodyParser({ sourceType: 'document' }),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(400);
     expect(res._body).toContain('Required');
@@ -190,6 +202,7 @@ describe('handleEmbeddingRoutes', () => {
         embedding: [0.1, 0.2, 0.3],
         modelId: 'text-embedding-3-small',
       }),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(201);
     const body = JSON.parse(res._body) as Record<string, unknown>;
@@ -212,6 +225,7 @@ describe('handleEmbeddingRoutes', () => {
       req, res,
       '/api/embeddings/search?q=test+query&modelId=text-embedding-3-small',
       createBodyParser({}),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(200);
     const body = JSON.parse(res._body) as unknown[];
@@ -227,6 +241,7 @@ describe('handleEmbeddingRoutes', () => {
       req, res,
       '/api/embeddings/search?q=test&modelId=text-embedding-3-small',
       createBodyParser({}),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(429);
     expect(res._body).toContain('Token budget exceeded');
@@ -245,6 +260,7 @@ describe('handleEmbeddingRoutes', () => {
       req, res,
       '/api/embeddings/search?q=test&modelId=text-embedding-3-small',
       createBodyParser({}),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(429);
     expect(res._body).toContain('Cost budget exceeded');
@@ -263,6 +279,7 @@ describe('handleEmbeddingRoutes', () => {
       req, res,
       '/api/embeddings/search?q=test&modelId=text-embedding-3-small',
       createBodyParser({}),
+      createMockAuth(),
     );
     expect(res._statusCode).toBe(502);
     expect(res._body).toContain('Failed to generate query embedding');
@@ -273,7 +290,7 @@ describe('handleEmbeddingRoutes', () => {
   it('returns 404 for unmatched embedding routes', async () => {
     const req = createMockReq('GET');
     const res = createMockRes();
-    await handleEmbeddingRoutes(req, res, '/api/embeddings/unknown', createBodyParser({}));
+    await handleEmbeddingRoutes(req, res, '/api/embeddings/unknown', createBodyParser({}), createMockAuth());
     expect(res._statusCode).toBe(404);
   });
 });

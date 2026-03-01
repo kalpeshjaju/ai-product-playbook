@@ -7,7 +7,7 @@
  *      Three-tier model: PUBLIC (no auth), USER (api-key or JWT), ADMIN (+ x-admin-key).
  * HOW: Checks Authorization Bearer first (Clerk JWT), falls back to x-api-key.
  *      Clerk is optional — if CLERK_SECRET_KEY is not set, JWT verification is skipped.
- *      Fail-open when neither API_KEYS nor CLERK_SECRET_KEY is configured (dev mode).
+ *      AUTH_MODE controls behavior: 'strict' (default) requires auth, 'open' skips (dev only).
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-03-01
@@ -75,6 +75,17 @@ export function getRequiredTier(url: string, method: string): AuthTier {
   return 'public';
 }
 
+// ─── Auth mode ───
+
+type AuthMode = 'strict' | 'open';
+
+/** Get the configured auth mode. Defaults to 'strict' in production. */
+export function getAuthMode(): AuthMode {
+  const mode = process.env.AUTH_MODE?.toLowerCase();
+  if (mode === 'open') return 'open';
+  return 'strict';
+}
+
 // ─── API key validation ───
 
 let cachedApiKeys: Set<string> | null = null;
@@ -85,6 +96,9 @@ function getValidApiKeys(): Set<string> {
   cachedApiKeys = new Set(
     raw.split(',').map((k) => k.trim()).filter(Boolean),
   );
+  // API_INTERNAL_KEY is always valid (used by web/admin frontends)
+  const internalKey = process.env.API_INTERNAL_KEY;
+  if (internalKey) cachedApiKeys.add(internalKey);
   return cachedApiKeys;
 }
 
@@ -95,8 +109,6 @@ export function clearApiKeyCache(): void {
 
 function isValidApiKey(key: string): boolean {
   const keys = getValidApiKeys();
-  // Fail-open: no API_KEYS configured = skip validation (dev/test backward compat)
-  if (keys.size === 0) return true;
   return keys.has(key);
 }
 
@@ -157,11 +169,28 @@ function extractBearerToken(req: IncomingMessage): string | null {
 
 // ─── Main authentication function ───
 
-/** Check if we're in fail-open mode (no auth configured). */
-function isFailOpenMode(): boolean {
+/**
+ * Validate auth configuration at startup.
+ * In strict mode, at least one auth provider must be configured.
+ * Throws if misconfigured — call before createServer().
+ */
+export function validateAuthConfig(): void {
+  const mode = getAuthMode();
+  if (mode === 'open') {
+    process.stdout.write('WARN: AUTH_MODE=open — authentication disabled (dev mode only)\n');
+    return;
+  }
+
   const keys = getValidApiKeys();
   const hasClerk = Boolean(process.env.CLERK_SECRET_KEY);
-  return keys.size === 0 && !hasClerk;
+
+  if (keys.size === 0 && !hasClerk) {
+    throw new Error(
+      'AUTH_MODE=strict but no auth providers configured. ' +
+      'Set API_KEYS, API_INTERNAL_KEY, or CLERK_SECRET_KEY. ' +
+      'For dev, set AUTH_MODE=open explicitly.',
+    );
+  }
 }
 
 /**
@@ -246,8 +275,8 @@ export async function authenticateRequest(
     return { userContext, tier, authMethod: 'api-key' };
   }
 
-  // Fail-open: no API_KEYS and no CLERK_SECRET_KEY configured
-  if (isFailOpenMode()) {
+  // AUTH_MODE=open: explicit dev opt-in to skip auth
+  if (getAuthMode() === 'open') {
     const userContext = createUserContext(req);
     return { userContext, tier, authMethod: 'none' };
   }
@@ -274,15 +303,11 @@ const SKIP_SEGMENTS = new Set(['search']);
 /**
  * Verify the authenticated user owns the resource being accessed.
  * Returns true if ownership is valid or not applicable.
- * Skips IDOR check in fail-open mode.
  */
 export function verifyUserOwnership(
   url: string,
   authenticatedUserId: string,
 ): boolean {
-  // Skip IDOR in fail-open mode
-  if (isFailOpenMode()) return true;
-
   const parsedUrl = new URL(url, 'http://localhost');
 
   // Check query param userId (used by generations, memory/search)

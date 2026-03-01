@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { createUserContext, createUserContextFromValues, withLangfuseHeaders } from '../src/identity/context.js';
+import { createUserContext, createUserContextFromValues, withLangfuseHeaders, hashApiKey } from '../src/identity/context.js';
 
 describe('createUserContext', () => {
-  it('extracts userId from x-api-key header', () => {
+  it('extracts hashed userId from x-api-key header', () => {
     const ctx = createUserContext({
       headers: { 'x-api-key': 'my-api-key-123' },
     });
-    expect(ctx.userId).toBe('my-api-key-123');
+    expect(ctx.userId).toBe(hashApiKey('my-api-key-123'));
+    expect(ctx.userId).toMatch(/^key_[0-9a-f]{16}$/);
     expect(ctx.source).toBe('api_key');
   });
 
@@ -57,7 +58,7 @@ describe('createUserContext', () => {
         'x-forwarded-for': '1.2.3.4',
       },
     });
-    expect(ctx.userId).toBe('api-key-wins');
+    expect(ctx.userId).toBe(hashApiKey('api-key-wins'));
     expect(ctx.source).toBe('api_key');
   });
 });

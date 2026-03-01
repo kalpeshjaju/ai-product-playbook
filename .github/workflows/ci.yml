@@ -44,10 +44,9 @@ jobs:
       - run: npm ci --legacy-peer-deps
 
       # Dependency vulnerability scan (SECURITY.md §Dependency Policy)
-      # continue-on-error: transitive vulns in composio-core we can't fix without breaking downgrade
-      - name: npm audit
-        run: npm audit --audit-level=high --omit=dev
-        continue-on-error: true
+      # Blocking gate — unfixable vulns must be in .audit-allowlist.json with expiry
+      - name: npm audit (with allowlist)
+        run: node scripts/audit-with-allowlist.js
 
       # TypeScript + ESLint + Tests via Turborepo
       - name: Type check
@@ -150,7 +149,9 @@ jobs:
       REDIS_URL: redis://localhost:6379
       NODE_ENV: test
       ADMIN_API_KEY: test-admin-key-for-ci
-      API_KEYS: ''
+      AUTH_MODE: open
+      API_KEYS: test-api-key-for-ci
+      API_INTERNAL_KEY: test-internal-key-for-ci
     steps:
       - uses: actions/checkout@v4
 

@@ -9,12 +9,21 @@
  * LAST UPDATED: 2026-03-01
  */
 
+import { createHash } from 'node:crypto';
 import type { UserContext, LangfuseHeaders } from './types.js';
 
 /** Minimal request interface — works with Node http, Express, or any object with headers. */
 export interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
   socket?: { remoteAddress?: string };
+}
+
+/**
+ * Hash an API key to a short, non-reversible identifier.
+ * Prevents raw keys from leaking into logs, Redis, or Langfuse traces.
+ */
+export function hashApiKey(key: string): string {
+  return 'key_' + createHash('sha256').update(key).digest('hex').slice(0, 16);
 }
 
 /**
@@ -25,10 +34,10 @@ export interface RequestLike {
  * signature should be verified upstream by auth middleware).
  */
 export function createUserContext(req: RequestLike): UserContext {
-  // 1. API key
+  // 1. API key — hash it so raw keys never reach logs/Redis/Langfuse
   const apiKey = req.headers['x-api-key'];
   if (typeof apiKey === 'string' && apiKey.length > 0) {
-    return { userId: apiKey, source: 'api_key' };
+    return { userId: hashApiKey(apiKey), source: 'api_key' };
   }
 
   // 2. Bearer JWT — extract `sub` and `email` claims

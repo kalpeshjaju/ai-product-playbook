@@ -7,14 +7,13 @@
 
 import type { AdminUser } from '@playbook/shared-types';
 import { StatusBadge } from '@playbook/shared-ui';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+import { API_URL, getApiHeaders } from '../lib/api';
 
 const ROLE_STATUS = { owner: 'active', editor: 'draft', viewer: 'deprecated' } as const;
 
 async function getUsers(): Promise<AdminUser[]> {
   try {
-    const res = await fetch(`${API_URL}/api/users`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/api/users`, { cache: 'no-store', headers: getApiHeaders() });
     if (!res.ok) return [];
     return await res.json() as AdminUser[];
   } catch {

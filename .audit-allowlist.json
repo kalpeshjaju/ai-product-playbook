@@ -1,0 +1,8 @@
+{
+  "composio-core": {
+    "reason": "Transitive high vuln in composio-core — no fix available without breaking downgrade",
+    "expires": "2026-06-01",
+    "addedBy": "Claude Opus 4.6",
+    "addedOn": "2026-03-01"
+  }
+}

@@ -184,14 +184,27 @@ describe('authenticateRequest', () => {
     expect(result!.authMethod).toBe('api-key');
   });
 
-  it('passes in fail-open mode when API_KEYS is empty', async () => {
+  it('passes in AUTH_MODE=open when no valid key provided', async () => {
+    vi.stubEnv('AUTH_MODE', 'open');
+    vi.stubEnv('API_KEYS', '');
+    clearApiKeyCache();
+    const req = createMockReq('GET', {});
+    const res = createMockRes();
+    const result = await authenticateRequest(req, res, '/api/preferences/user1');
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('user');
+    expect(result!.authMethod).toBe('none');
+  });
+
+  it('rejects invalid key in AUTH_MODE=strict even with no API_KEYS', async () => {
+    vi.stubEnv('AUTH_MODE', 'strict');
     vi.stubEnv('API_KEYS', '');
     clearApiKeyCache();
     const req = createMockReq('GET', { 'x-api-key': 'any-key' });
     const res = createMockRes();
     const result = await authenticateRequest(req, res, '/api/preferences/user1');
-    expect(result).not.toBeNull();
-    expect(result!.tier).toBe('user');
+    expect(result).toBeNull();
+    expect(res._statusCode).toBe(401);
   });
 
   it('returns 403 when x-admin-key is missing on admin routes', async () => {
@@ -311,9 +324,9 @@ describe('verifyUserOwnership', () => {
     expect(verifyUserOwnership('/api/memory/other-user', 'user-1')).toBe(false);
   });
 
-  it('skips IDOR in fail-open mode (no API_KEYS)', () => {
+  it('enforces IDOR even when API_KEYS is empty (IDOR bypass now in server.ts via authMethod)', () => {
     vi.stubEnv('API_KEYS', '');
     clearApiKeyCache();
-    expect(verifyUserOwnership('/api/preferences/any-user', 'different-user')).toBe(true);
+    expect(verifyUserOwnership('/api/preferences/any-user', 'different-user')).toBe(false);
   });
 });

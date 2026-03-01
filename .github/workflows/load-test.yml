@@ -87,7 +87,9 @@ jobs:
           NODE_ENV: test
           DATABASE_URL: postgresql://playbook_test:test_password_ci@localhost:5432/playbook_test
           REDIS_URL: redis://localhost:6379
-          API_KEYS: ''
+          AUTH_MODE: open
+          API_KEYS: test-api-key-for-ci
+          API_INTERNAL_KEY: test-internal-key-for-ci
           ADMIN_API_KEY: test-admin-key
 
       - name: Wait for API
