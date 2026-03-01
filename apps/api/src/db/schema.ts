@@ -154,6 +154,16 @@ export const documents = pgTable(
     ingestedAt: timestamp('ingested_at', { withTimezone: true }).defaultNow().notNull(),
     validUntil: timestamp('valid_until', { withTimezone: true }),
     metadata: jsonb('metadata'),
+    // §19 Input Pillar — raw source storage, chunking, enrichment tracking
+    rawContent: customType<{ data: Buffer; driverParam: Buffer }>({
+      dataType: () => 'bytea',
+      toDriver: (v: Buffer) => v,
+      fromDriver: (v: unknown) => v as Buffer,
+    })('raw_content'),
+    rawContentUrl: text('raw_content_url'),
+    chunkStrategy: text('chunk_strategy').notNull().default('fixed'),
+    enrichmentStatus: jsonb('enrichment_status').default({}),
+    sourceType: text('source_type').notNull().default('document'),
   },
   (table) => [
     index('idx_documents_hash').on(table.contentHash),

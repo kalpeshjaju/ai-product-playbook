@@ -101,6 +101,36 @@ every embedding must have its model tagged.
 
 ---
 
+### 4. `documents`
+
+Tracks ingested documents with content hashing for dedup,
+chunk count for embedding status, and freshness via valid_until.
+§19 Input Pillar additions: raw source, chunk strategy, enrichment status.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `uuid` | PK, auto-random | Unique identifier |
+| `title` | `text` | NOT NULL | Document title |
+| `source_url` | `text` | nullable | Original source URL |
+| `mime_type` | `text` | NOT NULL, default 'text/plain' | Content MIME type |
+| `content_hash` | `text` | NOT NULL | SHA-256 hash for dedup |
+| `chunk_count` | `integer` | NOT NULL, default 0 | Number of chunks created |
+| `embedding_model_id` | `text` | nullable | Model used for embeddings |
+| `ingested_at` | `timestamptz` | NOT NULL, default now() | When document was ingested |
+| `valid_until` | `timestamptz` | nullable | Freshness expiry — null means never expires |
+| `metadata` | `jsonb` | nullable | Additional context |
+| `raw_content` | `bytea` | nullable | Raw binary content (§19) |
+| `raw_content_url` | `text` | nullable | S3/R2 URL for large files (§19) |
+| `chunk_strategy` | `text` | NOT NULL, default 'fixed' | Chunking strategy used (§19) |
+| `enrichment_status` | `jsonb` | default '{}' | Pipeline enrichment tracking (§19) |
+| `source_type` | `text` | NOT NULL, default 'document' | Input modality: document, audio, image, web, csv, api (§19) |
+
+**Indexes:**
+- `idx_documents_hash` — `(content_hash)` — dedup lookups
+- `idx_documents_ingested` — `(ingested_at)` — freshness queries
+
+---
+
 ## Deferred Tables
 
 Per §20 Layer Investment Sequencing (Month 3–6+):
