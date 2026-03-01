@@ -92,6 +92,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate PR has proof section
+        id: proof
         env:
           EVENT_PATH: ${{ github.event_path }}
         run: |
@@ -126,6 +127,17 @@ jobs:
           fi
 
           echo "✅ Proof section present with content"
+
+      - name: Capture proof validation failure
+        if: failure() && steps.proof.outcome == 'failure'
+        run: |
+          bash scripts/capture-feedback.sh \
+            --type ci-failure \
+            --source ci \
+            --summary "PR missing proof section — no execution evidence" \
+            --bucket stub-shipped \
+            --automatable true \
+            --automatable-as pre-commit-hook || true
 
   escalation-scan:
     runs-on: ubuntu-latest

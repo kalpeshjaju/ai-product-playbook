@@ -133,6 +133,8 @@ Template: `docs/contracts/TEMPLATE.md`. Save contracts to `docs/contracts/YYYY-M
 
 If the user's request doesn't include a contract, generate one and get approval before coding.
 
+**Small change exemption:** If a PR touches 2 or fewer files AND intent is DOCS or BUGFIX, inline the contract in the PR body (skip the `docs/contracts/` file) and skip impact graph (not needed for 1-2 files).
+
 ### Pillar 2: Change Impact Graph (before and after coding)
 
 Before pushing, run: `bash scripts/impact-graph.sh`
