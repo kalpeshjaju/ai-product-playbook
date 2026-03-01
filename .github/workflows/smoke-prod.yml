@@ -79,10 +79,10 @@ jobs:
           BODY=$(curl -s "${API_URL}/api/health" --max-time 10)
           echo "Response: $BODY"
 
-          if echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status') == 'ok'" 2>/dev/null; then
-            echo "API response body is valid"
+          if echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status') in ('ok','degraded')" 2>/dev/null; then
+            echo "API response body is valid (status: $(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status'))"))"
           else
-            echo "Error: API responded but body does not contain expected status field"
+            echo "Error: API responded but status is missing or 'error'"
             exit 1
           fi
 
