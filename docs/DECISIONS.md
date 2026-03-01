@@ -105,6 +105,17 @@
 **Reason**: Solo dev already has Vercel + Railway + Postgres + Clerk. Strapi adds Docker dependency, another service to deploy, API token management, and CORS config — all for a feature that existing infrastructure already supports. The admin app already has CRUD patterns (PromptManager, Memory browser) that can be reused for entries management.
 **Consequences**: `services/strapi/` directory remains as dormant scaffold. Content types defined there (`playbook-entry`, `product-page`) should inform the Drizzle schema when entries table is added. `docker-compose.yml` retains the strapi service definition for potential future use.
 
+### DEC-007: P0 Security — Users Route Admin-Only + CORS Production Block [ACTIVE]
+**Date**: 2026-03-02
+**Author**: Claude Opus 4.6
+**Status**: ACTIVE
+**Revisit when**: Public user directory feature is needed (would require a new read-only subset route).
+
+**Problem**: `/api/users` was `public` tier — returns PII (emails, names, roles) from Clerk without auth. CORS defaulted to `*` when `ALLOWED_ORIGINS` unset in production.
+**Decision**: (1) `/api/users` tier changed to `admin` (requires `x-admin-key`). (2) CORS in production without `ALLOWED_ORIGINS` no longer sets `Access-Control-Allow-Origin` header (browser blocks cross-origin). Dev/test still allows `*`.
+**Reason**: PII exposure and open CORS are P0 security blockers before external user access.
+**Consequences**: Admin panel must send `x-admin-key` for user listing. `ALLOWED_ORIGINS` must be set on Railway for cross-origin frontend access (already configured).
+
 ---
 
 ## SUPERSEDED Decisions

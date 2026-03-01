@@ -42,7 +42,7 @@ const ROUTE_RULES: RouteRule[] = [
   { prefix: '/api/health', tier: 'public' },
   { prefix: '/api/entries', methods: ['GET'], tier: 'public' },
   { prefix: '/api/entries', methods: ['POST', 'PATCH', 'DELETE'], tier: 'admin' },
-  { prefix: '/api/users', tier: 'public' },
+  { prefix: '/api/users', methods: ['GET'], tier: 'admin' },
 
   // ADMIN — mutations that affect global state or execute external actions
   { prefix: '/api/costs/reset', methods: ['POST'], tier: 'admin' },
