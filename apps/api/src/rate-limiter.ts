@@ -8,7 +8,8 @@
  *
  * HOW: Track tokens consumed per user per 24h window. Block when budget exceeded.
  *      Uses ioredis for Railway Redis (not Upstash).
- *      Fail-open when Redis unavailable (graceful degradation).
+ *      Production: fail-CLOSED when Redis unavailable (security-first).
+ *      Development: fail-open for local dev without Redis.
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-02-28
@@ -19,6 +20,7 @@ import { Redis } from 'ioredis';
 const DAILY_TOKEN_BUDGET = 100_000; // §18 line 3962: 100K tokens/user/day
 const WINDOW_SECONDS = 86_400;      // 24 hours
 const KEY_PREFIX = 'ratelimit:tokens:';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 let redis: Redis | null = null;
 
@@ -62,8 +64,13 @@ export async function checkTokenBudget(
 ): Promise<TokenBudgetResult> {
   const client = getRedis();
 
-  // Fail-open when Redis not configured or unavailable
+  // Production: fail-closed when Redis unavailable (deny-of-wallet protection)
+  // Development: fail-open for local dev without Redis
   if (!client) {
+    if (IS_PRODUCTION) {
+      process.stderr.write('WARN: Redis unavailable in production — blocking request (fail-closed)\n');
+      return { allowed: false, remaining: 0, limit: DAILY_TOKEN_BUDGET };
+    }
     return { allowed: true, remaining: DAILY_TOKEN_BUDGET, limit: DAILY_TOKEN_BUDGET };
   }
 
@@ -90,7 +97,12 @@ export async function checkTokenBudget(
       limit: DAILY_TOKEN_BUDGET,
     };
   } catch {
-    // Fail-open: Redis error should not block users
+    // Production: fail-closed on Redis errors (deny-of-wallet protection)
+    // Development: fail-open so devs aren't blocked by Redis issues
+    if (IS_PRODUCTION) {
+      process.stderr.write('WARN: Redis error in production — blocking request (fail-closed)\n');
+      return { allowed: false, remaining: 0, limit: DAILY_TOKEN_BUDGET };
+    }
     return { allowed: true, remaining: DAILY_TOKEN_BUDGET, limit: DAILY_TOKEN_BUDGET };
   }
 }

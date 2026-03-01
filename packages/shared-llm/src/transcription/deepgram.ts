@@ -26,9 +26,18 @@ export interface TranscribeOptions {
   punctuate?: boolean;   // default: true
 }
 
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 500;
+
+/** Whether the HTTP status is a transient error worth retrying. */
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
 /**
  * Transcribe an audio buffer to text via Deepgram.
- * Returns null when DEEPGRAM_API_KEY not set or on any failure.
+ * Retries up to 3 times with exponential backoff for transient failures (5xx, 429).
+ * Returns null when DEEPGRAM_API_KEY not set or on permanent failure.
  */
 export async function transcribeAudio(
   audioBuffer: Buffer,
@@ -51,40 +60,63 @@ export async function transcribeAudio(
     punctuate: String(punctuate),
   });
 
-  try {
-    const response = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': mimeType,
-      },
-      body: new Uint8Array(audioBuffer),
-    });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': mimeType,
+        },
+        body: new Uint8Array(audioBuffer),
+      });
 
-    if (!response.ok) {
-      process.stderr.write(`WARN: Deepgram API returned ${response.status}\n`);
+      // Permanent client error (4xx except 429) — don't retry
+      if (!response.ok && !isRetryableStatus(response.status)) {
+        process.stderr.write(`WARN: Deepgram API returned ${response.status} — not retryable\n`);
+        return null;
+      }
+
+      // Transient error — retry with backoff
+      if (!response.ok && isRetryableStatus(response.status)) {
+        if (attempt < MAX_RETRIES) {
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          process.stderr.write(`WARN: Deepgram API returned ${response.status} — retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})\n`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        process.stderr.write(`WARN: Deepgram API returned ${response.status} — all ${MAX_RETRIES} retries exhausted\n`);
+        return null;
+      }
+
+      const data = await response.json() as {
+        results?: {
+          channels?: Array<{
+            alternatives?: Array<{ transcript?: string; confidence?: number }>;
+          }>;
+        };
+        metadata?: { duration?: number };
+      };
+
+      const alternative = data.results?.channels?.[0]?.alternatives?.[0];
+      if (!alternative?.transcript) return null;
+
+      return {
+        text: alternative.transcript,
+        confidence: alternative.confidence ?? 0,
+        durationSeconds: data.metadata?.duration ?? 0,
+      };
+    } catch {
+      if (attempt < MAX_RETRIES) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        process.stderr.write(`WARN: Deepgram network error — retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})\n`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      process.stderr.write('WARN: Deepgram transcription failed after all retries — returning null\n');
       return null;
     }
-
-    const data = await response.json() as {
-      results?: {
-        channels?: Array<{
-          alternatives?: Array<{ transcript?: string; confidence?: number }>;
-        }>;
-      };
-      metadata?: { duration?: number };
-    };
-
-    const alternative = data.results?.channels?.[0]?.alternatives?.[0];
-    if (!alternative?.transcript) return null;
-
-    return {
-      text: alternative.transcript,
-      confidence: alternative.confidence ?? 0,
-      durationSeconds: data.metadata?.duration ?? 0,
-    };
-  } catch {
-    process.stderr.write('WARN: Deepgram transcription failed — returning null (fail-open)\n');
-    return null;
   }
+
+  return null;
 }

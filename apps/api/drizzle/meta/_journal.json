@@ -8,6 +8,13 @@
       "when": 1772336853247,
       "tag": "0000_sticky_tomorrow_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772423253247,
+      "tag": "0001_add_hnsw_index",
+      "breakpoints": true
     }
   ]
 }

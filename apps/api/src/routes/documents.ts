@@ -30,12 +30,17 @@ type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 /** Default embedding model — §19 HARD GATE: vectors must be tagged with model_id. */
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 
+/** Configurable chunk defaults. Override per-request or via env vars. */
+const DEFAULT_CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE_CHARS ?? '2000', 10);
+const DEFAULT_CHUNK_OVERLAP = parseInt(process.env.CHUNK_OVERLAP_CHARS ?? '200', 10);
+
 /**
  * Simple recursive character text splitter.
  * Produces ~500 token chunks with 50 token overlap.
  * Approximation: 1 token ≈ 4 characters.
+ * Configurable via env vars CHUNK_SIZE_CHARS / CHUNK_OVERLAP_CHARS or per-request.
  */
-function chunkText(text: string, chunkSize = 2000, overlap = 200): string[] {
+function chunkText(text: string, chunkSize = DEFAULT_CHUNK_SIZE, overlap = DEFAULT_CHUNK_OVERLAP): string[] {
   const chunks: string[] = [];
   let start = 0;
 
@@ -216,6 +221,8 @@ export async function handleDocumentRoutes(
     const modelId = (body.modelId as string) ?? DEFAULT_EMBEDDING_MODEL;
     const validUntil = body.validUntil as string | undefined;
     const metadata = body.metadata as Record<string, unknown> | undefined;
+    const chunkSize = typeof body.chunkSize === 'number' ? body.chunkSize : undefined;
+    const chunkOverlap = typeof body.chunkOverlap === 'number' ? body.chunkOverlap : undefined;
 
     if (!title || !content) {
       res.statusCode = 400;
@@ -236,8 +243,8 @@ export async function handleDocumentRoutes(
       return;
     }
 
-    // Chunk the content
-    const chunks = chunkText(content);
+    // Chunk the content (configurable per-request or via env defaults)
+    const chunks = chunkText(content, chunkSize, chunkOverlap);
 
     // Generate embeddings (fail-open)
     const embeddingVectors = await generateEmbeddings(chunks, modelId, langfuseHeaders);

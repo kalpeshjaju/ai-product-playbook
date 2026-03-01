@@ -65,11 +65,15 @@ export interface ObservabilityReport extends CostReport {
 }
 
 // ============================================================================
-// Pricing (update when models change)
+// Pricing (per 1M tokens)
+//
+// WHY these specific models: they're our LiteLLM proxy's model_list.
+// HOW to extend: add to BASE_PRICING and/or ALIASES, or set env var
+//   COST_PRICING_OVERRIDES='{"my-model":{"input":1,"output":5}}'
 // ============================================================================
 
-const PRICING: Record<string, { input: number; output: number }> = {
-  // Anthropic (per 1M tokens)
+const BASE_PRICING: Record<string, { input: number; output: number }> = {
+  // Anthropic
   'claude-sonnet-4-6-20250218': { input: 3.00, output: 15.00 },
   'claude-opus-4-6-20250205': { input: 15.00, output: 75.00 },
   'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
@@ -78,9 +82,43 @@ const PRICING: Record<string, { input: number; output: number }> = {
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
   // Together AI / OSS
   'deepseek-v3': { input: 0.15, output: 0.60 },
-  // Fallback
+  // Fallback for unknown models (fail-expensive, not fail-silent)
   'default': { input: 3.00, output: 15.00 },
 };
+
+/** LiteLLM alias → canonical model. Keeps pricing DRY. */
+const MODEL_ALIASES: Record<string, string> = {
+  'claude-3-5-sonnet': 'claude-sonnet-4-6-20250218',
+  'claude-3-opus': 'claude-opus-4-6-20250205',
+  'claude-3-haiku': 'claude-haiku-4-5-20251001',
+  'gpt-4o-2024-08-06': 'gpt-4o',
+  'openai/gpt-4o': 'gpt-4o',
+  'openai/gpt-4o-mini': 'gpt-4o-mini',
+  'together_ai/deepseek-v3': 'deepseek-v3',
+};
+
+/** Merge base pricing with env overrides (parsed once at module load). */
+function buildPricing(): Record<string, { input: number; output: number }> {
+  const merged = { ...BASE_PRICING };
+  const overrides = process.env.COST_PRICING_OVERRIDES;
+  if (overrides) {
+    try {
+      const parsed = JSON.parse(overrides) as Record<string, { input: number; output: number }>;
+      Object.assign(merged, parsed);
+    } catch {
+      process.stderr.write('WARN: COST_PRICING_OVERRIDES env var is not valid JSON — ignored\n');
+    }
+  }
+  return merged;
+}
+
+const PRICING = buildPricing();
+
+/** Resolve model name through aliases, then look up pricing. */
+function getModelPricing(model: string): { input: number; output: number } {
+  const canonical = MODEL_ALIASES[model] ?? model;
+  return PRICING[canonical] ?? PRICING['default']!;
+}
 
 const MAX_RECENT_CALLS_PER_AGENT = 100;
 
@@ -168,7 +206,7 @@ export class CostLedger {
     latencyMs: number,
     success: boolean
   ): void {
-    const pricing = PRICING[model] ?? PRICING['default']!;
+    const pricing = getModelPricing(model);
     const costUSD = (inputTokens / 1_000_000) * pricing.input
                   + (outputTokens / 1_000_000) * pricing.output;
 
