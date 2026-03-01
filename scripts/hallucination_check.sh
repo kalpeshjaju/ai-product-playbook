@@ -102,7 +102,7 @@ while IFS= read -r f; do
   [ ! -f "$f" ] && continue
 
   case "$f" in
-    tests/*|*.test.*|*.spec.*|*.example|.env*|*.md) continue ;;
+    tests/*|*.test.*|*.spec.*|*.example|.env*|*.md|scripts/hallucination_check.sh) continue ;;
   esac
 
   for pattern in "${FABRICATION_PATTERNS[@]}"; do
