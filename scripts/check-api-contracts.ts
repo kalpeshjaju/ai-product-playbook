@@ -34,19 +34,12 @@ function extractRoutes(): Map<string, string[]> {
       routes.get(route)!.push(file);
     }
 
-    // Match regex routes: url.match(/^\/api\/.../)
-    const regexMatches = content.matchAll(/match\(\s*\/(.+?)\//g);
-    for (const m of regexMatches) {
-      const pattern = m[1];
-      if (!pattern.includes('/api/') && !pattern.includes('\\/api\\/')) continue;
-      const readable = pattern
-        .replace(/\\\//g, '/')
-        .replace(/^\^/, '')
-        .replace(/\$$/, '')
-        .replace(/\(\[^\/\]\+\)/g, ':param')
-        .replace(/\(\[^\/\]\+?\)/g, ':param');
-      if (!routes.has(readable)) routes.set(readable, []);
-      routes.get(readable)!.push(file);
+    // Match JSDoc route annotations: *   GET  /api/...
+    const jsdocMatches = content.matchAll(/\*\s+(?:GET|POST|PATCH|PUT|DELETE)\s+(\/api\/[^\s*]+)/g);
+    for (const m of jsdocMatches) {
+      const route = m[1];
+      if (!routes.has(route)) routes.set(route, []);
+      routes.get(route)!.push(file);
     }
   }
 

@@ -30,7 +30,7 @@ describe('DataCard', () => {
 
   it('does not render subtitle when omitted', () => {
     const { container } = render(<DataCard title="Calls" value={100} />);
-    const subtitleElements = container.querySelectorAll('.text-xs');
-    expect(subtitleElements.length).toBe(0);
+    const paragraphs = container.querySelectorAll('p');
+    expect(paragraphs.length).toBe(2); // title + value only
   });
 });

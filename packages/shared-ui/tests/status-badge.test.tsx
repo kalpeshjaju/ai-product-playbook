@@ -11,6 +11,17 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { StatusBadge } from '../src/status-badge';
 
+/**
+ * Convert hex color to the RGB string that jsdom returns via style.backgroundColor.
+ * This lets tests document the expected hex value while comparing against jsdom's conversion.
+ */
+function hexToRgb(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 describe('StatusBadge', () => {
   it('renders status text by default', () => {
     render(<StatusBadge status="active" />);
@@ -25,18 +36,18 @@ describe('StatusBadge', () => {
   it('applies green background for active status', () => {
     const { container } = render(<StatusBadge status="active" />);
     const badge = container.querySelector('span');
-    expect(badge?.style.backgroundColor).toBe('rgb(34, 197, 94)');
+    expect(badge?.style.backgroundColor).toBe(hexToRgb('#22c55e'));
   });
 
   it('applies yellow background for draft status', () => {
     const { container } = render(<StatusBadge status="draft" />);
     const badge = container.querySelector('span');
-    expect(badge?.style.backgroundColor).toBe('rgb(234, 179, 8)');
+    expect(badge?.style.backgroundColor).toBe(hexToRgb('#eab308'));
   });
 
   it('applies red background for deprecated status', () => {
     const { container } = render(<StatusBadge status="deprecated" />);
     const badge = container.querySelector('span');
-    expect(badge?.style.backgroundColor).toBe('rgb(239, 68, 68)');
+    expect(badge?.style.backgroundColor).toBe(hexToRgb('#ef4444'));
   });
 });
