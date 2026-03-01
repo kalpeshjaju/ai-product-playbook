@@ -60,26 +60,8 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
-
-      - run: npm ci --legacy-peer-deps
-
-      - name: Enable pgvector extension on Railway Postgres
-        continue-on-error: true
-        run: |
-          if [ -n "$DATABASE_URL" ]; then
-            psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;" && echo "pgvector extension enabled" || echo "WARN: pgvector not available on this Postgres instance — embedding search won't work until upgraded"
-          else
-            echo "WARN: DATABASE_URL not set — skipping pgvector extension"
-          fi
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: Apply database migrations
-        run: cd apps/api && npx drizzle-kit push
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Migrations + pgvector now run inside the Docker entrypoint on Railway
+      # (no need for external DB access from CI)
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli

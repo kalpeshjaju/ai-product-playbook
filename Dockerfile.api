@@ -24,6 +24,9 @@ COPY apps/api/src/ apps/api/src/
 # Copy Drizzle migrations if they exist
 COPY apps/api/drizzle/ apps/api/drizzle/
 
+# Copy entrypoint script
+COPY apps/api/entrypoint.sh apps/api/entrypoint.sh
+
 # Build
 RUN npx turbo run build --filter=@playbook/api...
 
@@ -37,4 +40,5 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3002/api/health').then(r => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1))"
 
-CMD ["node", "apps/api/dist/server.js"]
+# Entrypoint runs drizzle migrations + pgvector setup, then starts the server
+CMD ["sh", "apps/api/entrypoint.sh"]
