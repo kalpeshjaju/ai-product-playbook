@@ -44,6 +44,12 @@ test-results/
 # Security
 .cache_ggshield
 
+# Build info (cache artifacts)
+*.tsbuildinfo
+
+# Generated analysis output
+ownership-map-out/
+
 # Misc
 *.log
 tmp/
