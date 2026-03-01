@@ -172,9 +172,11 @@ if [ -f ".env.example" ]; then
   USED_ENVS=$(echo "$CHANGED_ALL" | while IFS= read -r f; do
     [ -z "$f" ] && continue
     [ ! -f "$f" ] && continue
-    grep -ohE 'os\.environ\[["'"'"'][A-Z_]+["'"'"']\]|os\.getenv\(["'"'"'][A-Z_]+["'"'"']|environ\.get\(["'"'"'][A-Z_]+["'"'"']' "$f" 2>/dev/null \
-      | grep -oE '[A-Z_]{3,}' || true
-    grep -ohE 'process\.env\.[A-Z_]+|NEXT_PUBLIC_[A-Z_]+' "$f" 2>/dev/null \
+    # Skip test, spec, and config files — they often reference env vars for test setup
+    [[ "$f" == tests/* || "$f" == *.test.* || "$f" == *.spec.* ]] && continue
+    grep -ohE 'os\.environ\[["'"'"'][A-Z0-9_]+["'"'"']\]|os\.getenv\(["'"'"'][A-Z0-9_]+["'"'"']|environ\.get\(["'"'"'][A-Z0-9_]+["'"'"']' "$f" 2>/dev/null \
+      | grep -oE '[A-Z0-9_]{3,}' || true
+    grep -ohE 'process\.env\.[A-Z0-9_]+|NEXT_PUBLIC_[A-Z0-9_]+' "$f" 2>/dev/null \
       | sed 's/process\.env\.//' || true
   done | sort -u)
 
