@@ -144,6 +144,34 @@ When flipping env vars on Railway, always check `railway logs` for the startup m
 
 ---
 
+## 2026-03-01 — Auth Hardening + Ingest Persistence + CI Fullstack E2E
+
+### What changed
+- `getAuthMode()` refuses `AUTH_MODE=open` in production (break-glass `AUTH_ALLOW_OPEN_IN_PRODUCTION=true` available)
+- Open mode now enforces `x-admin-key` on admin routes — relaxes user auth only, not admin auth
+- `/api/ingest` now persists to DB via `DocumentPersistenceService` (was parse-only, wrote nothing)
+- CI switched from `AUTH_MODE=open` to `AUTH_MODE=strict` — zero test changes needed
+- CI `api-contract` job now runs fullstack Playwright E2E (web + admin dev servers)
+- Extracted shared persistence pipeline from `documents.ts` into `services/document-persistence.ts`
+- 14 new auth tests, 4 new ingest contract tests, 9 persistence unit tests
+
+### What failed / what worked
+- **Failed:** Refactoring `documents.ts` to use the persistence service changed response shape from `{ document: {...} }` to `{ documentId: "..." }`. Two existing unit tests broke (`expect(body.document).toBeDefined()`). Fix: grep tests for response field names before refactoring route handlers.
+- **Worked:** Switching CI to `AUTH_MODE=strict` required zero test changes — contract tests already sent proper `x-api-key` and `x-admin-key` headers. The open mode was masking nothing, just hiding potential regressions.
+- **Worked:** Clerk phone verification disabled in dashboard → Indian numbers now work for sign-in.
+- **Worked:** Auth hardening verified locally — `POST /api/costs/reset` without admin key returns 403 even in open mode.
+
+### Lesson learned
+`AUTH_MODE=open` in CI is a silent risk multiplier — tests pass whether auth works or not, so auth regressions can ship undetected. Always run CI in the same auth mode as production. Also: when extracting route handler logic into a service, the response shape almost always changes — check tests first.
+
+### Validation
+- 177/177 unit tests pass, type-check clean
+- Local curl: open mode + no admin key → 403, with admin key → 200
+- Clerk login works on both web + admin, user visible in `/api/users`
+- Production API returns Kalpesh Jaju as registered user
+
+---
+
 ## Anti-Pattern Registry
 
 > Quick-reference table. Add a row when you discover a new anti-pattern.
@@ -175,3 +203,7 @@ When flipping env vars on Railway, always check `railway logs` for the startup m
 | Use `LITELLM_PROXY_URL` directly for health checks | URL ends with `/v1` — health endpoint is at root, not `/v1/health` | Strip `/v1` suffix before calling `/health/liveliness` | 2026-03-01 |
 | Assume Together AI models are all serverless | "Non-serverless" models return errors without dedicated deployment | Check `/v1/models` endpoint for availability before configuring | 2026-03-01 |
 | Railway Dockerfile `COPY file.yaml` when `RAILWAY_DOCKERFILE_PATH` is set | Build context is repo root, not Dockerfile directory — COPY fails | Use `COPY services/litellm/config.yaml /app/config.yaml` (full path from root) | 2026-03-01 |
+| `AUTH_MODE=open` in CI | Auth regressions ship undetected — tests pass regardless | Run CI in `AUTH_MODE=strict` (same as production) | 2026-03-01 |
+| `AUTH_MODE=open` bypasses admin routes | Admin mutations accessible without `x-admin-key` in dev/test | Open mode relaxes user auth only; always enforce admin key | 2026-03-01 |
+| Refactor route → service without checking test assertions | Response shape changes (`body.document` → `body.documentId`) break tests | Grep tests for response field names before refactoring routes | 2026-03-01 |
+| Ingest route parses but doesn't persist | `/api/ingest` returned parsed text but wrote nothing to DB | Always wire ingestion to a persistence pipeline | 2026-03-01 |
