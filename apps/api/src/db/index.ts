@@ -13,4 +13,5 @@ export {
   userPreferences,
   outcomes,
   fewShotBank,
+  playbookEntries,
 } from './schema.js';

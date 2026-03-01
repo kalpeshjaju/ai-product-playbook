@@ -323,20 +323,76 @@ describe('Document Ingestion (Postgres)', () => {
 
 // ─── Static Data Routes ────────────────────────────────────────
 
-describe('Static Data Routes', () => {
-  it('returns playbook entries', async () => {
+describe('Playbook Entries (Postgres)', () => {
+  const testEntryTitle = `E2E Entry ${Date.now()}`;
+  let createdId: string;
+
+  it('creates an entry', async () => {
+    const { status, body } = await post('/api/entries', {
+      title: testEntryTitle,
+      summary: 'E2E test entry for contract tests',
+      category: 'resilience',
+      status: 'active',
+    });
+    expect(status).toBe(201);
+    expect(body.title).toBe(testEntryTitle);
+    expect(body.category).toBe('resilience');
+    expect(body.status).toBe('active');
+    expect(body.id).toBeTypeOf('string');
+    createdId = body.id as string;
+  });
+
+  it('lists entries (defaults to active)', async () => {
     const { status, body } = await get('/api/entries');
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
     const entries = body as unknown as Array<Record<string, unknown>>;
-    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.length).toBeGreaterThanOrEqual(1);
     expect(entries[0]).toHaveProperty('title');
     expect(entries[0]).toHaveProperty('summary');
   });
 
-  it('returns users list', async () => {
+  it('retrieves a single entry by ID', async () => {
+    const { status, body } = await get(`/api/entries/${createdId}`);
+    expect(status).toBe(200);
+    expect(body.title).toBe(testEntryTitle);
+  });
+
+  it('updates an entry', async () => {
+    const { status, body } = await patch(`/api/entries/${createdId}`, {
+      summary: 'Updated summary',
+    });
+    expect(status).toBe(200);
+    expect(body.summary).toBe('Updated summary');
+  });
+
+  it('rejects invalid category', async () => {
+    const { status, body } = await post('/api/entries', {
+      title: 'Bad',
+      summary: 'Bad',
+      category: 'invalid-category',
+    });
+    expect(status).toBe(400);
+    expect(body.error).toContain('category');
+  });
+
+  it('returns 404 for non-existent entry', async () => {
+    const { status } = await get('/api/entries/00000000-0000-0000-0000-000000000000');
+    expect(status).toBe(404);
+  });
+
+  it('deletes an entry', async () => {
+    const { status, body } = await del(`/api/entries/${createdId}`);
+    expect(status).toBe(200);
+    expect(body.deleted).toBe(createdId);
+  });
+});
+
+describe('Users (Clerk)', () => {
+  it('returns users list (array)', async () => {
     const { status, body } = await get('/api/users');
     expect(status).toBe(200);
+    // Array — either Clerk users or empty (CLERK_SECRET_KEY not set in CI)
     expect(Array.isArray(body)).toBe(true);
   });
 });

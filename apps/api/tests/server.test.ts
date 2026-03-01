@@ -101,6 +101,18 @@ vi.mock('../src/routes/few-shot.js', () => ({
   handleFewShotRoutes: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../src/routes/entries.js', () => ({
+  handleEntryRoutes: vi.fn().mockImplementation((_req: unknown, res: http.ServerResponse) => {
+    res.end(JSON.stringify([]));
+  }),
+}));
+
+vi.mock('../src/routes/users.js', () => ({
+  handleUserRoutes: vi.fn().mockImplementation((_req: unknown, res: http.ServerResponse) => {
+    res.end(JSON.stringify([]));
+  }),
+}));
+
 vi.mock('../src/db/index.js', () => ({
   db: {
     execute: vi.fn().mockResolvedValue([{ '?column?': 1 }]),
@@ -118,8 +130,6 @@ vi.mock('drizzle-orm', () => ({
 vi.mock('@playbook/shared-llm', () => ({
   createUserContext: vi.fn().mockReturnValue({ userId: 'test-user', source: 'ip' }),
 }));
-
-vi.mock('@playbook/shared-types', () => ({}));
 
 // Helper to make HTTP requests
 function request(

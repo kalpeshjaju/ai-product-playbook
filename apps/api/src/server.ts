@@ -12,7 +12,6 @@
 
 import * as Sentry from '@sentry/node';
 import { createServer, type IncomingMessage } from 'node:http';
-import type { PlaybookEntry, AdminUser } from '@playbook/shared-types';
 import { createUserContext } from '@playbook/shared-llm';
 import { checkTokenBudget, shutdownRedis } from './rate-limiter.js';
 import { checkCostBudget } from './cost-guard.js';
@@ -29,6 +28,8 @@ import { handleEmbeddingRoutes } from './routes/embeddings.js';
 import { handlePreferenceRoutes } from './routes/preferences.js';
 import { handleTranscriptionRoutes } from './routes/transcription.js';
 import { handleFewShotRoutes } from './routes/few-shot.js';
+import { handleEntryRoutes } from './routes/entries.js';
+import { handleUserRoutes } from './routes/users.js';
 import { authenticateRequest, verifyUserOwnership } from './middleware/auth.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 import { db } from './db/index.js';
@@ -58,15 +59,6 @@ function getAllowedOrigins(): Set<string> | null {
   if (!raw) return null;
   return new Set(raw.split(',').map((o) => o.trim()).filter(Boolean));
 }
-
-const entries: PlaybookEntry[] = [
-  { id: '1', title: 'JSON Extraction', summary: 'Multi-strategy repair', category: 'resilience', status: 'active' },
-  { id: '2', title: 'Cost Ledger', summary: 'Budget enforcement', category: 'cost', status: 'active' },
-];
-
-const users: AdminUser[] = [
-  { id: 'u1', name: 'Kalpesh Jaju', email: 'kalpesh@example.com', role: 'owner' },
-];
 
 /** Parse JSON body from incoming request. */
 function parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -274,14 +266,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (url === '/api/entries') {
-    res.end(JSON.stringify(entries));
-  } else if (url === '/api/users') {
-    res.end(JSON.stringify(users));
-  } else {
-    res.statusCode = 404;
-    res.end(JSON.stringify({ error: 'Not found' }));
+  // ─── Playbook entries CRUD (DEC-006: Drizzle, not Strapi) ───
+  if (url.startsWith('/api/entries')) {
+    await handleEntryRoutes(req, res, url, parseBody);
+    return;
   }
+
+  // ─── Users from Clerk (DEC-006: Clerk, not Strapi) ───
+  if (url.startsWith('/api/users')) {
+    await handleUserRoutes(req, res, url);
+    return;
+  }
+
+  res.statusCode = 404;
+  res.end(JSON.stringify({ error: 'Not found' }));
 });
 
 server.listen(PORT, () => {

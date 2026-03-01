@@ -7,7 +7,7 @@
  * HOW: Drizzle ORM schema definitions. Run `npm run db:push` to sync to DB.
  *
  * Tables: prompt_versions, ai_generations, embeddings, documents,
- *         user_preferences, outcomes.
+ *         user_preferences, outcomes, playbook_entries.
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-03-01
@@ -221,5 +221,28 @@ export const fewShotBank = pgTable(
   (table) => [
     index('idx_few_shot_task').on(table.taskType, table.qualityScore),
     index('idx_few_shot_active').on(table.isActive, table.taskType),
+  ],
+);
+
+// ─── Table 8: playbook_entries (replaces hardcoded entries array) ────────────
+// Content entries for the playbook. Schema informed by Strapi scaffold
+// (services/strapi/) but stored directly in Postgres per DEC-006.
+export const playbookEntries = pgTable(
+  'playbook_entries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    content: text('content'),
+    category: text('category').notNull(), // resilience | cost | quality | deployment
+    status: text('status').notNull().default('draft'), // active | draft | deprecated
+    sectionRef: text('section_ref'),      // e.g. "§18", "§21" — links to playbook section
+    sortOrder: integer('sort_order').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_entries_category').on(table.category, table.status),
+    index('idx_entries_status').on(table.status, table.sortOrder),
   ],
 );

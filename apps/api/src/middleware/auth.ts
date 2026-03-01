@@ -40,7 +40,8 @@ interface RouteRule {
 const ROUTE_RULES: RouteRule[] = [
   // PUBLIC — no auth required
   { prefix: '/api/health', tier: 'public' },
-  { prefix: '/api/entries', tier: 'public' },
+  { prefix: '/api/entries', methods: ['GET'], tier: 'public' },
+  { prefix: '/api/entries', methods: ['POST', 'PATCH', 'DELETE'], tier: 'admin' },
   { prefix: '/api/users', tier: 'public' },
 
   // ADMIN — mutations that affect global state or execute external actions
