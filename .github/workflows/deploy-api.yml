@@ -39,13 +39,13 @@ jobs:
       - name: Disable needrestart for zerox postinstall
         run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
 
+      - name: Release guard checks
+        run: bash scripts/prod_release_guard.sh
+
       - run: npm ci --legacy-peer-deps
 
       - name: Type check + Build
         run: npx turbo run build type-check
-
-      - name: Release guard checks
-        run: bash scripts/prod_release_guard.sh
 
   deploy:
     runs-on: ubuntu-latest

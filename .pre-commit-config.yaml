@@ -5,3 +5,12 @@ repos:
       - id: ggshield
         language_version: python3
         stages: [pre-commit]
+  - repo: local
+    hooks:
+      - id: sync-claude-nav
+        name: Sync CLAUDE.md navigation map
+        entry: python3 scripts/sync_claude_nav.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
