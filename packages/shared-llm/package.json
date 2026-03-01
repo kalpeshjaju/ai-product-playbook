@@ -15,6 +15,7 @@
   "dependencies": {
     "@getzep/zep-js": "^2.0.0",
     "braintrust": "^0.0.182",
+    "bullmq": "^5.70.1",
     "composio-core": "^0.5.0",
     "jsonrepair": "^3.11.0",
     "mem0ai": "^2.2.0",
