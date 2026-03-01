@@ -1,0 +1,13 @@
+# DSPy Prompt Optimizer — Railway deployment config
+#
+# WHY: One-shot worker, not an HTTP service. Runs optimization and exits.
+# HOW: Uses the existing Dockerfile. No port, no health check, no restart.
+#      Triggered manually or via GitHub Actions workflow.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# One-shot worker — no HTTP port
+restartPolicyType = "NEVER"

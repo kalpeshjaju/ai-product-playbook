@@ -1,0 +1,60 @@
+# DSPy Prompt Optimization Pipeline
+#
+# WHY: Automates prompt optimization via DSPy (Playbook §20).
+#      Builds the optimizer container and triggers it on Railway.
+# HOW: Manual dispatch with prompt name, min examples, and dry run flag.
+#
+# AUTHOR: Claude Opus 4.6
+# LAST UPDATED: 2026-03-01
+
+name: DSPy Prompt Optimization
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt_name:
+        description: 'Prompt name to optimize (e.g., job_match_scoring)'
+        required: true
+        type: string
+      min_examples:
+        description: 'Minimum training examples required'
+        required: false
+        default: '50'
+        type: string
+      dry_run:
+        description: 'Dry run — skip POST to API'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  optimize:
+    name: Run DSPy Optimizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r services/dspy/requirements.txt
+
+      - name: Run optimization
+        working-directory: services/dspy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          LITELLM_PROXY_URL: ${{ secrets.LITELLM_PROXY_URL }}
+          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
+          API_URL: ${{ secrets.API_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          python optimize.py \
+            --prompt-name "${{ inputs.prompt_name }}" \
+            --min-examples ${{ inputs.min_examples }} \
+            ${{ inputs.dry_run == true && '--dry-run' || '' }}

@@ -6,7 +6,7 @@
  *      Returns mock data using shared types.
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-02-28
+ * LAST UPDATED: 2026-03-01
  */
 
 import * as Sentry from '@sentry/node';
@@ -14,8 +14,13 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { PlaybookEntry, AdminUser } from '@playbook/shared-types';
 import { createUserContext } from '@playbook/shared-llm';
 import { checkTokenBudget } from './rate-limiter.js';
+import { checkCostBudget } from './cost-guard.js';
 import { verifyTurnstileToken } from './middleware/turnstile.js';
 import { handlePromptRoutes } from './routes/prompts.js';
+import { handleCostRoutes } from './routes/costs.js';
+import { handleMemoryRoutes } from './routes/memory.js';
+import { handleComposioRoutes } from './routes/composio.js';
+import { handleOpenPipeRoutes } from './routes/openpipe.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 
 // Sentry — no-op when DSN not set
@@ -108,11 +113,46 @@ const server = createServer(async (req, res) => {
       }));
       return;
     }
+
+    // ─── Cost budget guard (§18) ───
+    const costCheck = checkCostBudget();
+    if (!costCheck.allowed) {
+      res.statusCode = 429;
+      res.end(JSON.stringify({
+        error: 'Cost budget exceeded',
+        report: costCheck.report,
+      }));
+      return;
+    }
+  }
+
+  // ─── Cost observability routes ───
+  if (url.startsWith('/api/costs')) {
+    handleCostRoutes(req, res, url);
+    return;
   }
 
   // ─── Prompt versioning routes (§20) ───
   if (url.startsWith('/api/prompts')) {
     await handlePromptRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Tier 2: Memory routes ───
+  if (url.startsWith('/api/memory')) {
+    await handleMemoryRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Tier 2: Composio routes ───
+  if (url.startsWith('/api/composio')) {
+    await handleComposioRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Tier 2: OpenPipe routes ───
+  if (url.startsWith('/api/openpipe')) {
+    await handleOpenPipeRoutes(req, res, url, parseBody);
     return;
   }
 
