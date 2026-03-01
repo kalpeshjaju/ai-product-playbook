@@ -27,7 +27,7 @@ test.describe('Admin App Smoke Tests', () => {
   test('prompts page loads', async ({ page }) => {
     await page.goto(`${ADMIN_URL}/prompts`);
     await expect(page).toHaveURL(/\/prompts/);
-    await expect(page.getByRole('heading', { name: /prompt/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Prompt Management' })).toBeVisible();
   });
 
   test('costs page loads', async ({ page }) => {
