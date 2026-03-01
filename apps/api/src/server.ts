@@ -140,7 +140,10 @@ const server = createServer(async (req, res) => {
         // Strip /v1 suffix — LITELLM_PROXY_URL typically ends with /v1 for OpenAI compat,
         // but the health endpoint is at the root: /health, not /v1/health
         const baseUrl = litellmUrl.replace(/\/v1\/?$/, '');
-        const litellmRes = await fetch(`${baseUrl}/health`, { signal: controller.signal });
+        const healthHeaders: Record<string, string> = {};
+        const litellmKey = process.env.LITELLM_API_KEY;
+        if (litellmKey) healthHeaders['Authorization'] = `Bearer ${litellmKey}`;
+        const litellmRes = await fetch(`${baseUrl}/health`, { signal: controller.signal, headers: healthHeaders });
         clearTimeout(timer);
         litellmStatus = litellmRes.ok ? 'ok' : 'unreachable';
       } catch {
