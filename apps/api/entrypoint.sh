@@ -1,9 +1,9 @@
 #!/bin/sh
 # API server entrypoint — runs drizzle migrations + pgvector setup before starting
-set -e
+# Migration and extension steps are non-fatal — server starts regardless
 
 echo "=== Running database migrations ==="
-npx drizzle-kit push --config apps/api/drizzle.config.ts 2>&1
+(cd /app/apps/api && npx drizzle-kit push 2>&1) || echo "WARN: migrations failed — server will start anyway"
 
 echo "=== Enabling pgvector extension ==="
 node -e "
