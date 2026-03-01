@@ -58,12 +58,17 @@ export async function setup(): Promise<void> {
   const serverPath = resolve(process.cwd(), 'apps/api/dist/server.js');
   process.stdout.write(`[contract-tests] Starting API server: node ${serverPath}\n`);
 
+  // Use provided API_KEYS or generate a deterministic test key so auth doesn't reject
+  const testApiKey = 'e2e-test-key-do-not-use-in-production';
+  const apiKeys = process.env.API_KEYS || testApiKey;
+
   serverProcess = spawn('node', [serverPath], {
     env: {
       ...process.env,
       PORT,
       NODE_ENV: 'test',
-      API_KEYS: process.env.API_KEYS ?? '',
+      AUTH_MODE: process.env.AUTH_MODE ?? 'open',
+      API_KEYS: apiKeys,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
