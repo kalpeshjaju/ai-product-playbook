@@ -9,6 +9,8 @@ export { WebIngester } from './adapters/web.js';
 export { CsvIngester } from './adapters/csv.js';
 export { ApiFeedIngester } from './adapters/api-feed.js';
 export { computeFreshnessMultiplier } from './freshness.js';
+export { isHashDuplicate, cosineSimilarity, NEAR_DEDUP_THRESHOLD } from './dedup/index.js';
+export type { NearDedupResult } from './dedup/index.js';
 export { createIngestionQueue, JobType } from './pipeline/queue.js';
 export type { JobTypeValue } from './pipeline/queue.js';
 export type { IngestionJobData } from './pipeline/jobs.js';
