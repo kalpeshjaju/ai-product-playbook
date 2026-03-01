@@ -105,6 +105,82 @@ jobs:
       - name: Lint Python
         run: ruff check packages/ apps/ --config pyproject.toml
 
+  # ─── API contract tests (real Postgres + Redis) ──────────────────────
+  api-contract:
+    runs-on: ubuntu-latest
+    needs: quality-gates
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: playbook_test
+          POSTGRES_PASSWORD: test_password_ci
+          POSTGRES_DB: playbook_test
+        options: >-
+          --health-cmd "pg_isready -U playbook_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://playbook_test:test_password_ci@localhost:5432/playbook_test
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      ADMIN_API_KEY: test-admin-key-for-ci
+      API_KEYS: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Enable pgvector extension
+        run: PGPASSWORD=test_password_ci psql -h localhost -U playbook_test -d playbook_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+      - name: Apply database schema
+        run: npx drizzle-kit push --config apps/api/drizzle.config.ts
+        env:
+          DATABASE_URL: postgresql://playbook_test:test_password_ci@localhost:5432/playbook_test
+
+      - name: Build API and dependencies
+        run: npx turbo run build --filter=@playbook/api...
+
+      - name: Start API server
+        run: node apps/api/dist/server.js &
+        env:
+          PORT: '3002'
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3002/api/health > /dev/null 2>&1; then
+              echo "API healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start within 60s"
+          exit 1
+
+      - name: Run contract tests
+        run: npm run test:contract
+        env:
+          E2E_API_URL: http://localhost:3002
+          TEST_API_KEY: test-api-key-for-ci
+          TEST_ADMIN_KEY: test-admin-key-for-ci
+
   # ─── E2E smoke tests (Playwright) ─────────────────────────────────
   e2e:
     runs-on: ubuntu-latest

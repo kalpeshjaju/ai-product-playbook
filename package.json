@@ -19,6 +19,7 @@
     "test": "turbo run test",
     "check": "turbo run type-check lint test",
     "test:e2e": "playwright test",
+    "test:contract": "vitest run --config vitest.e2e.config.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
