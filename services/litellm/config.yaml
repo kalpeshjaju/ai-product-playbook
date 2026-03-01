@@ -29,11 +29,11 @@ model_list:
       model: openai/gpt-4o-mini
       api_key: "os.environ/OPENAI_API_KEY"
 
-  # ─── OpenRouter (Mercury) — uncomment when OPENROUTER_API_KEY is set ─
-  # - model_name: mercury-coder
-  #   litellm_params:
-  #     model: openrouter/inception/mercury-coder-small-beta
-  #     api_key: "os.environ/OPENROUTER_API_KEY"
+  # ─── OpenRouter (Mercury) ─────────────────────────────────────────
+  - model_name: mercury-coder
+    litellm_params:
+      model: openrouter/inception/mercury-coder-small-beta
+      api_key: "os.environ/OPENROUTER_API_KEY"
 
   # ─── Embedding (§19 INPUT — pgvector requires consistent model_id) ───
   - model_name: text-embedding-3-small
