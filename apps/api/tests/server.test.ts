@@ -128,9 +128,13 @@ vi.mock('drizzle-orm', () => ({
   sql: (strings: TemplateStringsArray) => strings.join(''),
 }));
 
-vi.mock('@playbook/shared-llm', () => ({
-  createUserContext: vi.fn().mockReturnValue({ userId: 'test-user', source: 'ip' }),
-}));
+vi.mock('@playbook/shared-llm', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createUserContext: vi.fn().mockReturnValue({ userId: 'test-user', source: 'ip' }),
+  };
+});
 
 // Helper to make HTTP requests
 function request(

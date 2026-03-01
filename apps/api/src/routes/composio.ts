@@ -18,6 +18,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getAvailableActions, executeAction, scanOutput } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
+  ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
 
 export async function handleComposioRoutes(
   req: IncomingMessage,
@@ -57,7 +59,10 @@ export async function handleComposioRoutes(
       ? JSON.stringify(result.data)
       : String(result.data ?? '');
     if (textToScan.length > 0) {
-      const guard = await scanOutput(textToScan, { enableLlamaGuard: false });
+      const guard = await scanOutput(textToScan, {
+        enableLlamaGuard: true,
+        failureMode: guardrailFailureMode,
+      });
       if (!guard.passed) {
         res.statusCode = 422;
         res.end(JSON.stringify({

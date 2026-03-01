@@ -34,12 +34,18 @@ import {
   parseDocument,
   isSupportedMimeType,
   costLedger,
+  routeQuery,
 } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
 /** Default embedding model — §19 HARD GATE: vectors must be tagged with model_id. */
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
+const EMBEDDING_MODEL_BY_TIER = {
+  fast: 'text-embedding-3-small',
+  balanced: 'text-embedding-3-small',
+  quality: 'text-embedding-3-large',
+} as const;
 
 /** Configurable chunk defaults. Override per-request or via env vars. */
 const DEFAULT_CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE_CHARS ?? '2000', 10);
@@ -48,6 +54,22 @@ const DEFAULT_CHUNK_OVERLAP = parseInt(process.env.CHUNK_OVERLAP_CHARS ?? '200',
 /** Rough estimate for input tokens when provider usage metadata is unavailable. */
 function estimateTokens(charCount: number): number {
   return Math.max(1, Math.ceil(charCount / 4));
+}
+
+/**
+ * Resolve the embedding model ID for ingestion.
+ * If caller provides modelId, that always wins. Otherwise use RouteLLM
+ * complexity tier to pick between small/large embedding models.
+ */
+function resolveEmbeddingModelId(content: string, requestedModelId?: string): string {
+  if (requestedModelId && requestedModelId.length > 0) return requestedModelId;
+
+  const decision = routeQuery(content.slice(0, 4000), {
+    taskType: 'extraction',
+    defaultTier: 'balanced',
+  });
+
+  return EMBEDDING_MODEL_BY_TIER[decision.tier] ?? DEFAULT_EMBEDDING_MODEL;
 }
 
 /**
@@ -194,7 +216,7 @@ export async function handleDocumentRoutes(
       return;
     }
 
-    const modelId = DEFAULT_EMBEDDING_MODEL;
+    const modelId = resolveEmbeddingModelId(parsed.text);
     const contentHash = createHash('sha256').update(parsed.text).digest('hex');
 
     // Dedup
@@ -276,7 +298,7 @@ export async function handleDocumentRoutes(
     const content = body.content as string | undefined;
     const sourceUrl = body.sourceUrl as string | undefined;
     const mimeType = (body.mimeType as string) ?? 'text/plain';
-    const modelId = (body.modelId as string) ?? DEFAULT_EMBEDDING_MODEL;
+    const modelId = resolveEmbeddingModelId(content ?? '', body.modelId as string | undefined);
     const validUntil = body.validUntil as string | undefined;
     const metadata = body.metadata as Record<string, unknown> | undefined;
     const chunkSize = typeof body.chunkSize === 'number' ? body.chunkSize : undefined;

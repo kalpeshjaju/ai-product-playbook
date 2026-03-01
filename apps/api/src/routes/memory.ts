@@ -20,6 +20,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMemoryProvider, scanOutput } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
+  ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
 
 export async function handleMemoryRoutes(
   req: IncomingMessage,
@@ -50,7 +52,10 @@ export async function handleMemoryRoutes(
     // Guardrail: scan memory content before returning (§21)
     const memoryText = results.map(r => r.entry.content).join('\n');
     if (memoryText.length > 0) {
-      const guard = await scanOutput(memoryText, { enableLlamaGuard: false });
+      const guard = await scanOutput(memoryText, {
+        enableLlamaGuard: true,
+        failureMode: guardrailFailureMode,
+      });
       if (!guard.passed) {
         res.statusCode = 422;
         res.end(JSON.stringify({
@@ -74,7 +79,10 @@ export async function handleMemoryRoutes(
     // Guardrail: scan memory content before returning (§21)
     const memoryText = entries.map(e => e.content).join('\n');
     if (memoryText.length > 0) {
-      const guard = await scanOutput(memoryText, { enableLlamaGuard: false });
+      const guard = await scanOutput(memoryText, {
+        enableLlamaGuard: true,
+        failureMode: guardrailFailureMode,
+      });
       if (!guard.passed) {
         res.statusCode = 422;
         res.end(JSON.stringify({

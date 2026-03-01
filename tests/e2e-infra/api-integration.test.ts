@@ -90,6 +90,7 @@ async function postRaw(
     headers: {
       'Content-Type': contentType,
       'x-api-key': TEST_API_KEY,
+      'x-admin-key': TEST_ADMIN_KEY,
     },
     body,
   });
@@ -141,9 +142,9 @@ describe('Prompt Versioning (Postgres)', () => {
       author: 'e2e-test',
     });
     expect(status).toBe(201);
-    expect(body.prompt_name).toBe(testPromptName);
+    expect(body.promptName).toBe(testPromptName);
     expect(body.version).toBeTypeOf('string');
-    expect(body.content_hash).toBeTypeOf('string');
+    expect(body.contentHash).toBeTypeOf('string');
     expect(body.id).toBeTypeOf('string');
     createdId = body.id as string;
   });
@@ -160,7 +161,7 @@ describe('Prompt Versioning (Postgres)', () => {
       active_pct: 50,
     });
     expect(status).toBe(200);
-    expect(body.active_pct).toBe(50);
+    expect(body.activePct).toBe(50);
   });
 
   it('rejects invalid traffic allocation', async () => {
@@ -218,7 +219,7 @@ describe('Generation Logging (Postgres)', () => {
     });
     expect(status).toBe(201);
     expect(body.id).toBeTypeOf('string');
-    expect(body.user_id).toBe(testUserId);
+    expect(body.userId).toBe(testUserId);
     generationId = body.id as string;
   });
 
@@ -228,7 +229,7 @@ describe('Generation Logging (Postgres)', () => {
     expect(Array.isArray(body)).toBe(true);
     const generations = body as unknown as Array<Record<string, unknown>>;
     expect(generations.length).toBeGreaterThanOrEqual(1);
-    expect(generations[0]?.user_id).toBe(testUserId);
+    expect(generations[0]?.userId).toBe(testUserId);
   });
 
   it('retrieves generation stats', async () => {
@@ -244,7 +245,7 @@ describe('Generation Logging (Postgres)', () => {
       thumbs: 1,
     });
     expect(status).toBe(200);
-    expect(body.user_feedback).toBe('accepted');
+    expect(body.userFeedback).toBe('accepted');
     expect(body.thumbs).toBe(1);
   });
 
@@ -262,7 +263,7 @@ describe('Generation Logging (Postgres)', () => {
       outcomeValue: { detail: 'e2e test' },
     });
     expect(status).toBe(201);
-    expect(body.outcome_type).toBe('task_completed');
+    expect(body.outcomeType).toBe('task_completed');
   });
 });
 
@@ -448,8 +449,8 @@ describe('User Preferences (Postgres)', () => {
       preferenceValue: 'claude-opus-4-6',
     });
     expect(status).toBe(201);
-    expect(body.user_id).toBe(testUserId);
-    expect(body.preference_key).toBe(testKey);
+    expect(body.userId).toBe(testUserId);
+    expect(body.preferenceKey).toBe(testKey);
     expect(body.source).toBe('explicit');
     expect(body.confidence).toBe('1.00');
   });
@@ -460,7 +461,7 @@ describe('User Preferences (Postgres)', () => {
     expect(Array.isArray(body)).toBe(true);
     const prefs = body as unknown as Array<Record<string, unknown>>;
     expect(prefs.length).toBeGreaterThanOrEqual(1);
-    expect(prefs[0]?.preference_key).toBe(testKey);
+    expect(prefs[0]?.preferenceKey).toBe(testKey);
   });
 
   it('updates a preference value', async () => {
@@ -468,7 +469,7 @@ describe('User Preferences (Postgres)', () => {
       preferenceValue: 'claude-sonnet-4-6',
     });
     expect(status).toBe(200);
-    expect(body.preference_value).toBe('claude-sonnet-4-6');
+    expect(body.preferenceValue).toBe('claude-sonnet-4-6');
   });
 
   it('rejects update without preferenceValue', async () => {
@@ -510,9 +511,9 @@ describe('Few-Shot Bank (Postgres)', () => {
       qualityScore: 0.95,
     });
     expect(status).toBe(201);
-    expect(body.task_type).toBe(taskType);
-    expect(body.curated_by).toBe('manual');
-    expect(body.is_active).toBe(true);
+    expect(body.taskType).toBe(taskType);
+    expect(body.curatedBy).toBe('manual');
+    expect(body.isActive).toBe(true);
     expect(body.id).toBeTypeOf('string');
     createdId = body.id as string;
   });
@@ -523,7 +524,7 @@ describe('Few-Shot Bank (Postgres)', () => {
     expect(Array.isArray(body)).toBe(true);
     const examples = body as unknown as Array<Record<string, unknown>>;
     expect(examples.length).toBeGreaterThanOrEqual(1);
-    expect(examples[0]?.task_type).toBe(taskType);
+    expect(examples[0]?.taskType).toBe(taskType);
   });
 
   it('rejects GET without taskType', async () => {

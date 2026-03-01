@@ -19,8 +19,10 @@
 import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { and, eq, gt, sql, sum } from 'drizzle-orm';
+import { createUserContext } from '@playbook/shared-llm';
 import { db } from '../db/index.js';
 import { promptVersions } from '../db/schema.js';
+import { resolvePromptWithAB } from '../middleware/prompt-ab.js';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -67,13 +69,27 @@ export async function handlePromptRoutes(
       return;
     }
 
-    const selected = weightedRandom(rows);
+    const userCtx = createUserContext(req);
+    const abSelection = await resolvePromptWithAB(userCtx.userId, promptName, rows);
+    const selected = abSelection
+      ? rows.find((row) => row.version === abSelection.version)
+      : weightedRandom(rows);
+
+    if (!selected) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: `No resolvable prompt version for: ${promptName}` }));
+      return;
+    }
+
     res.end(JSON.stringify({
-      prompt_name: selected!.promptName,
-      version: selected!.version,
-      content: selected!.content,
-      content_hash: selected!.contentHash,
-      eval_score: selected!.evalScore,
+      prompt_name: selected.promptName,
+      version: selected.version,
+      content: selected.content,
+      content_hash: selected.contentHash,
+      eval_score: selected.evalScore,
+      active_pct: selected.activePct,
+      variant: abSelection?.variant ?? 'weighted',
+      source: abSelection?.source ?? 'weighted-random',
     }));
     return;
   }

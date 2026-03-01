@@ -69,9 +69,10 @@ function weightedRandom<T extends { activePct: number }>(items: T[]): T | undefi
 export async function resolvePromptWithAB(
   userId: string,
   promptName: string,
+  providedActiveVersions?: PromptVersionRow[],
 ): Promise<PromptResolution | null> {
   // Fetch all active versions for this prompt
-  const activeVersions = await db
+  const activeVersions = providedActiveVersions ?? await db
     .select()
     .from(promptVersions)
     .where(and(eq(promptVersions.promptName, promptName), gt(promptVersions.activePct, 0))) as PromptVersionRow[];

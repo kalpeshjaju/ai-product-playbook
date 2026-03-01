@@ -60,7 +60,7 @@ export class ImageIngester implements Ingester {
           cleanup: true,
         });
 
-        const text = result.pages.map((p: { content: string }) => p.content).join('\n\n');
+        const text = result.pages.map((p) => p.content ?? '').join('\n\n');
         if (!text) return null;
 
         return {

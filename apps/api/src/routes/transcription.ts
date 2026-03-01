@@ -16,6 +16,8 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { transcribeAudio, scanOutput } from '@playbook/shared-llm';
+const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
+  ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
 
 /** Read raw body as Buffer (not JSON). */
 function readRawBody(req: IncomingMessage): Promise<Buffer> {
@@ -57,7 +59,10 @@ export async function handleTranscriptionRoutes(
     }
 
     // Guardrail: scan model-generated transcription before returning (§21)
-    const guard = await scanOutput(result.text, { enableLlamaGuard: false });
+    const guard = await scanOutput(result.text, {
+      enableLlamaGuard: true,
+      failureMode: guardrailFailureMode,
+    });
     if (!guard.passed) {
       res.statusCode = 422;
       res.end(JSON.stringify({

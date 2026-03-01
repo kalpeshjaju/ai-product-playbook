@@ -11,6 +11,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 const mockSelect = vi.fn();
 const mockInsert = vi.fn();
 const mockUpdate = vi.fn();
+const mockResolvePromptWithAB = vi.fn();
 
 vi.mock('../src/db/index.js', () => ({
   db: {
@@ -32,10 +33,14 @@ vi.mock('drizzle-orm', () => ({
   sum: (col: unknown) => col,
 }));
 
+vi.mock('../src/middleware/prompt-ab.js', () => ({
+  resolvePromptWithAB: (...args: unknown[]) => mockResolvePromptWithAB(...args),
+}));
+
 import { handlePromptRoutes } from '../src/routes/prompts.js';
 
 function createMockReq(method: string): IncomingMessage {
-  return { method } as IncomingMessage;
+  return { method, headers: {} } as IncomingMessage;
 }
 
 function createMockRes(): ServerResponse & { _body: string; _statusCode: number } {
@@ -58,6 +63,7 @@ function createBodyParser(body: Record<string, unknown>): (req: IncomingMessage)
 describe('handlePromptRoutes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolvePromptWithAB.mockResolvedValue(null);
   });
 
   it('GET /active returns 404 when no active versions exist', async () => {

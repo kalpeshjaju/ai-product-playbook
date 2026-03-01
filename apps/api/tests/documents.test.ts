@@ -98,6 +98,7 @@ vi.mock('@playbook/shared-llm', () => ({
   costLedger: { recordCall: vi.fn() },
   parseDocument: vi.fn(),
   isSupportedMimeType: vi.fn(),
+  routeQuery: vi.fn().mockReturnValue({ tier: 'balanced', reason: 'mock' }),
 }));
 
 vi.mock('../src/rate-limiter.js', () => ({

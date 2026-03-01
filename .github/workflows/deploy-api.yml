@@ -61,13 +61,8 @@ jobs:
       - name: Enable pgvector extension on Railway Postgres
         run: |
           if [ -n "$DATABASE_URL" ]; then
-            npx tsx -e "
-              const pg = require('postgres');
-              const sql = pg(process.env.DATABASE_URL);
-              await sql\`CREATE EXTENSION IF NOT EXISTS vector\`;
-              await sql.end();
-              console.log('pgvector extension enabled');
-            "
+            psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+            echo "pgvector extension enabled"
           else
             echo "WARN: DATABASE_URL not set — skipping pgvector extension"
           fi
