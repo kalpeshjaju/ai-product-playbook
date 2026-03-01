@@ -3,7 +3,7 @@ import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
 import { PostHogProvider } from '../providers/posthog-provider';
 import { ClerkProviderShell } from '../providers/clerk-provider-shell';
-import { NavLink } from '../components/nav-link';
+import { NavLink } from '@playbook/shared-ui';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -11,7 +11,8 @@ export const metadata: Metadata = {
   description: 'AI Product Playbook — Admin',
 };
 
-const NAV_ITEMS = [
+type NavItem = { href: string; label: string; exact?: boolean };
+const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Users', exact: true },
   { href: '/prompts', label: 'Prompts' },
   { href: '/costs', label: 'Costs' },

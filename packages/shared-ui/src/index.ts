@@ -14,3 +14,6 @@ export type { StatusBadgeProps } from './status-badge.js';
 
 export { DataCard } from './data-card.js';
 export type { DataCardProps } from './data-card.js';
+
+export { NavLink } from './nav-link.js';
+export type { NavLinkProps } from './nav-link.js';

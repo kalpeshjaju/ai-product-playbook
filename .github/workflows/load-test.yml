@@ -92,15 +92,16 @@ jobs:
 
       - name: Wait for API
         run: |
-          for i in 1 2 3 4 5; do
+          for i in $(seq 1 12); do
             if curl -sf http://localhost:3002/api/health; then
-              echo " API is ready"
+              echo "API is ready"
               exit 0
             fi
-            echo "Waiting for API... attempt $i"
-            sleep 5
+            sleep=$(( i < 4 ? 2 : 5 ))
+            echo "Waiting for API... attempt $i (sleeping ${sleep}s)"
+            sleep $sleep
           done
-          echo "API failed to start"
+          echo "API failed to start after 12 attempts"
           exit 1
 
       - name: Run k6 smoke test
