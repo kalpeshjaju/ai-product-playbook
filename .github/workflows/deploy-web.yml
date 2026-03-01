@@ -39,6 +39,9 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Disable needrestart for zerox postinstall
+        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
