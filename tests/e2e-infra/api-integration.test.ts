@@ -14,11 +14,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 
 const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3002';
 
 /** Auth headers — fail-open mode still requires header presence per auth.ts */
 const TEST_API_KEY = process.env.TEST_API_KEY ?? 'test-api-key-for-ci';
+
+/** The userId that the API derives from the hashed API key (matches shared-llm hashApiKey). */
+const AUTH_USER_ID = 'key_' + createHash('sha256').update(TEST_API_KEY).digest('hex').slice(0, 16);
 const TEST_ADMIN_KEY = process.env.TEST_ADMIN_KEY ?? 'test-admin-key-for-ci';
 
 /** Helper: JSON GET request */
@@ -202,12 +206,11 @@ describe('Prompt Versioning (Postgres)', () => {
 // ─── Generation Logging ────────────────────────────────────────
 
 describe('Generation Logging (Postgres)', () => {
-  const testUserId = `e2e-user-${Date.now()}`;
   let generationId: string;
 
   it('logs a generation record', async () => {
     const { status, body } = await post('/api/generations', {
-      userId: testUserId,
+      userId: AUTH_USER_ID,
       promptText: 'Test prompt for E2E',
       promptVersion: 'v1.0.0',
       taskType: 'e2e-test',
@@ -221,21 +224,21 @@ describe('Generation Logging (Postgres)', () => {
     });
     expect(status).toBe(201);
     expect(body.id).toBeTypeOf('string');
-    expect(body.userId).toBe(testUserId);
+    expect(body.userId).toBe(AUTH_USER_ID);
     generationId = body.id as string;
   });
 
   it('retrieves generations for user', async () => {
-    const { status, body } = await get(`/api/generations?userId=${testUserId}`);
+    const { status, body } = await get(`/api/generations?userId=${AUTH_USER_ID}`);
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
     const generations = body as unknown as Array<Record<string, unknown>>;
     expect(generations.length).toBeGreaterThanOrEqual(1);
-    expect(generations[0]?.userId).toBe(testUserId);
+    expect(generations[0]?.userId).toBe(AUTH_USER_ID);
   });
 
   it('retrieves generation stats', async () => {
-    const { status, body } = await get(`/api/generations/stats?userId=${testUserId}`);
+    const { status, body } = await get(`/api/generations/stats?userId=${AUTH_USER_ID}`);
     expect(status).toBe(200);
     expect(body.totalCalls).toBeTypeOf('number');
     expect(body.avgLatencyMs).toBeTypeOf('number');
@@ -261,7 +264,7 @@ describe('Generation Logging (Postgres)', () => {
   it('submits an outcome for a generation', async () => {
     const { status, body } = await post(`/api/feedback/${generationId}/outcome`, {
       outcomeType: 'task_completed',
-      userId: testUserId,
+      userId: AUTH_USER_ID,
       outcomeValue: { detail: 'e2e test' },
     });
     expect(status).toBe(201);
@@ -402,9 +405,9 @@ describe('Users (Clerk)', () => {
 
 // ─── Memory Routes (fail-open) ─────────────────────────────────
 
-describe('Memory Routes (fail-open)', () => {
+describe('Memory Routes', () => {
   it('GET /:userId returns response (data or disabled)', async () => {
-    const { status, body } = await get('/api/memory/test-user');
+    const { status, body } = await get(`/api/memory/${AUTH_USER_ID}`);
     expect([200]).toContain(status);
     expect(
       Array.isArray(body) || (body as Record<string, unknown>).enabled === false
@@ -414,7 +417,7 @@ describe('Memory Routes (fail-open)', () => {
   it('POST / returns response (created or disabled)', async () => {
     const { status, body } = await post('/api/memory', {
       content: 'Test memory for E2E',
-      userId: 'e2e-test-user',
+      userId: AUTH_USER_ID,
     });
     expect([200, 201]).toContain(status);
     expect(
@@ -423,7 +426,7 @@ describe('Memory Routes (fail-open)', () => {
   });
 
   it('GET /search returns response (results or disabled)', async () => {
-    const { status, body } = await get('/api/memory/search?q=test&userId=e2e-test-user');
+    const { status, body } = await get(`/api/memory/search?q=test&userId=${AUTH_USER_ID}`);
     expect([200]).toContain(status);
     expect(
       Array.isArray(body) || (body as Record<string, unknown>).enabled === false
@@ -442,23 +445,22 @@ describe('Memory Routes (fail-open)', () => {
 // ─── User Preferences CRUD ─────────────────────────────────────
 
 describe('User Preferences (Postgres)', () => {
-  const testUserId = `e2e-pref-user-${Date.now()}`;
   const testKey = 'preferred_model';
 
   it('creates an explicit preference', async () => {
-    const { status, body } = await post(`/api/preferences/${testUserId}`, {
+    const { status, body } = await post(`/api/preferences/${AUTH_USER_ID}`, {
       preferenceKey: testKey,
       preferenceValue: 'claude-opus-4-6',
     });
     expect(status).toBe(201);
-    expect(body.userId).toBe(testUserId);
+    expect(body.userId).toBe(AUTH_USER_ID);
     expect(body.preferenceKey).toBe(testKey);
     expect(body.source).toBe('explicit');
     expect(body.confidence).toBe('1.00');
   });
 
   it('retrieves preferences for user', async () => {
-    const { status, body } = await get(`/api/preferences/${testUserId}`);
+    const { status, body } = await get(`/api/preferences/${AUTH_USER_ID}`);
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
     const prefs = body as unknown as Array<Record<string, unknown>>;
@@ -467,7 +469,7 @@ describe('User Preferences (Postgres)', () => {
   });
 
   it('updates a preference value', async () => {
-    const { status, body } = await patch(`/api/preferences/${testUserId}/${testKey}`, {
+    const { status, body } = await patch(`/api/preferences/${AUTH_USER_ID}/${testKey}`, {
       preferenceValue: 'claude-sonnet-4-6',
     });
     expect(status).toBe(200);
@@ -475,24 +477,24 @@ describe('User Preferences (Postgres)', () => {
   });
 
   it('rejects update without preferenceValue', async () => {
-    const { status, body } = await patch(`/api/preferences/${testUserId}/${testKey}`, {});
+    const { status, body } = await patch(`/api/preferences/${AUTH_USER_ID}/${testKey}`, {});
     expect(status).toBe(400);
     expect(body.error).toBeTypeOf('string');
   });
 
   it('deletes a preference', async () => {
-    const { status, body } = await del(`/api/preferences/${testUserId}/${testKey}`);
+    const { status, body } = await del(`/api/preferences/${AUTH_USER_ID}/${testKey}`);
     expect(status).toBe(200);
     expect(body.deleted).toBe(testKey);
   });
 
   it('returns 404 deleting non-existent preference', async () => {
-    const { status } = await del(`/api/preferences/${testUserId}/nonexistent-key`);
+    const { status } = await del(`/api/preferences/${AUTH_USER_ID}/nonexistent-key`);
     expect(status).toBe(404);
   });
 
   it('triggers preference inference from feedback', async () => {
-    const { status, body } = await post(`/api/preferences/${testUserId}/infer`, {});
+    const { status, body } = await post(`/api/preferences/${AUTH_USER_ID}/infer`, {});
     expect(status).toBe(200);
     expect(body.inferred).toBeTypeOf('number');
     expect(Array.isArray(body.preferences)).toBe(true);
