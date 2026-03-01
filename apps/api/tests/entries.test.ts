@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage } from 'node:http';
+import { createMockReq, createMockRes } from './helpers.js';
 
 const mockSelect = vi.fn();
 const mockInsert = vi.fn();
@@ -19,7 +20,18 @@ vi.mock('../src/db/index.js', () => ({
     update: (...args: unknown[]) => mockUpdate(...args),
     delete: (...args: unknown[]) => mockDelete(...args),
   },
-  playbookEntries: {},
+  playbookEntries: {
+    id: 'id',
+    title: 'title',
+    summary: 'summary',
+    content: 'content',
+    category: 'category',
+    status: 'status',
+    sectionRef: 'section_ref',
+    sortOrder: 'sort_order',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+  },
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -28,25 +40,6 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 import { handleEntryRoutes } from '../src/routes/entries.js';
-
-function createMockReq(method: string, url = '/api/entries'): IncomingMessage {
-  return { method, url } as IncomingMessage;
-}
-
-function createMockRes(): ServerResponse & { _body: string; _statusCode: number } {
-  const res = {
-    statusCode: 200,
-    writableEnded: false,
-    _body: '',
-    _statusCode: 200,
-    end(body?: string) {
-      this._body = body ?? '';
-      this._statusCode = this.statusCode;
-      this.writableEnded = true;
-    },
-  } as unknown as ServerResponse & { _body: string; _statusCode: number };
-  return res;
-}
 
 function createBodyParser(body: Record<string, unknown>): (req: IncomingMessage) => Promise<Record<string, unknown>> {
   return () => Promise.resolve(body);

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import { createMockReq, createMockRes } from './helpers.js';
 
 const mockGetUserList = vi.fn();
 
@@ -19,40 +19,18 @@ vi.mock('@clerk/backend', () => ({
 
 import { handleUserRoutes } from '../src/routes/users.js';
 
-function createMockReq(method: string): IncomingMessage {
-  return { method } as IncomingMessage;
-}
-
-function createMockRes(): ServerResponse & { _body: string; _statusCode: number } {
-  const res = {
-    statusCode: 200,
-    writableEnded: false,
-    _body: '',
-    _statusCode: 200,
-    end(body?: string) {
-      this._body = body ?? '';
-      this._statusCode = this.statusCode;
-      this.writableEnded = true;
-    },
-  } as unknown as ServerResponse & { _body: string; _statusCode: number };
-  return res;
-}
-
 describe('handleUserRoutes', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   describe('GET /api/users', () => {
     it('returns empty array when CLERK_SECRET_KEY is not set (fail-open)', async () => {
-      delete process.env.CLERK_SECRET_KEY;
+      vi.stubEnv('CLERK_SECRET_KEY', '');
 
       const req = createMockReq('GET');
       const res = createMockRes();
@@ -64,7 +42,7 @@ describe('handleUserRoutes', () => {
     });
 
     it('returns mapped users when Clerk is configured', async () => {
-      process.env.CLERK_SECRET_KEY = 'sk_test_xxx';
+      vi.stubEnv('CLERK_SECRET_KEY', 'sk_test_xxx');
       mockGetUserList.mockResolvedValue({
         data: [
           {
@@ -113,6 +91,13 @@ describe('handleUserRoutes', () => {
     const req = createMockReq('POST');
     const res = createMockRes();
     await handleUserRoutes(req, res, '/api/users');
+    expect(res._statusCode).toBe(404);
+  });
+
+  it('returns 404 for GET on wrong path', async () => {
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleUserRoutes(req, res, '/api/users/123');
     expect(res._statusCode).toBe(404);
   });
 });

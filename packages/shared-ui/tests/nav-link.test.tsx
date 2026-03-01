@@ -4,7 +4,8 @@
  * Mocks next/navigation (usePathname) and next/link to test active class logic.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { NavLink } from '../src/nav-link';
 
@@ -31,6 +32,9 @@ vi.mock('next/link', () => ({
 describe('NavLink', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
     cleanup();
   });
 
@@ -69,7 +73,7 @@ describe('NavLink', () => {
   });
 
   it('applies activeClassName when pathname starts with href (prefix match)', () => {
-    mockUsePathname.mockReturnValue('/costs');
+    mockUsePathname.mockReturnValue('/costs/overview');
     render(
       <NavLink href="/costs" className="nav" activeClassName="active">
         Costs

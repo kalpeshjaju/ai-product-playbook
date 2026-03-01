@@ -27,10 +27,12 @@ test.describe('Admin App Smoke Tests', () => {
   test('prompts page loads', async ({ page }) => {
     await page.goto(`${ADMIN_URL}/prompts`);
     await expect(page).toHaveURL(/\/prompts/);
+    await expect(page.getByRole('heading', { name: /prompt/i })).toBeVisible();
   });
 
   test('costs page loads', async ({ page }) => {
     await page.goto(`${ADMIN_URL}/costs`);
     await expect(page).toHaveURL(/\/costs/);
+    await expect(page.getByRole('heading', { name: /costs/i })).toBeVisible();
   });
 });

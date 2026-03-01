@@ -25,10 +25,12 @@ test.describe('Web App Smoke Tests', () => {
   test('costs page loads without crash', async ({ page }) => {
     await page.goto('/costs');
     await expect(page).toHaveURL(/\/costs/);
+    await expect(page.getByRole('heading', { name: /costs/i })).toBeVisible();
   });
 
   test('prompts page loads without crash', async ({ page }) => {
     await page.goto('/prompts');
     await expect(page).toHaveURL(/\/prompts/);
+    await expect(page.getByRole('heading', { name: /prompts/i })).toBeVisible();
   });
 });
