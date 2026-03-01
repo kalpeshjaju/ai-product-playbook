@@ -37,9 +37,11 @@ origin_url="$(git remote get-url origin 2>/dev/null || true)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 [ "$branch" = "main" ] || fail "Production releases must run from 'main' (current: $branch)."
 
-# Check for uncommitted changes
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    fail "Tracked changes are present. Commit/stash before releasing to production."
+# Check for uncommitted changes (skip in CI — build artifacts are expected)
+if [ -z "${CI:-}" ]; then
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        fail "Tracked changes are present. Commit/stash before releasing to production."
+    fi
 fi
 
 # Check for untracked files (warning only)
