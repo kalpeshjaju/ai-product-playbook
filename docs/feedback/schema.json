@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Framework Feedback Event",
+  "description": "Captured after every PR merge, CI failure, or session reflect",
+  "type": "object",
+  "required": ["date", "type", "source", "summary"],
+  "properties": {
+    "date": { "type": "string", "format": "date" },
+    "type": {
+      "type": "string",
+      "enum": ["ci-failure", "pr-review-finding", "prove-it-failure", "session-reflect", "anti-pattern-discovered"]
+    },
+    "source": {
+      "type": "string",
+      "description": "Which LLM or system generated this event",
+      "enum": ["claude", "codex", "cursor", "gemini", "coderabbit", "ci", "human"]
+    },
+    "summary": { "type": "string" },
+    "rootCause": { "type": "string" },
+    "rootCauseBucket": {
+      "type": "string",
+      "enum": [
+        "hallucinated-import",
+        "env-drift",
+        "stub-shipped",
+        "test-gap",
+        "type-error",
+        "auth-bypass",
+        "response-shape-change",
+        "timeout-mismatch",
+        "missing-dependency",
+        "config-mismatch",
+        "other"
+      ]
+    },
+    "filesInvolved": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "automatable": {
+      "type": "boolean",
+      "description": "Can this failure class be caught by a lint rule, hook, or CI check?"
+    },
+    "automatableAs": {
+      "type": "string",
+      "enum": ["eslint-rule", "pre-commit-hook", "ci-script", "coderabbit-instruction", "claude-md-rule", "not-automatable"]
+    },
+    "recurrenceCount": {
+      "type": "integer",
+      "description": "How many times has this exact failure pattern occurred?",
+      "minimum": 1
+    },
+    "escalated": {
+      "type": "boolean",
+      "description": "Has this been converted into an automated check yet?"
+    },
+    "escalatedTo": {
+      "type": "string",
+      "description": "Path to the automated check file, if escalated"
+    }
+  }
+}

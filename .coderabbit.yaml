@@ -8,17 +8,49 @@ reviews:
     drafts: false
   path_instructions:
     - path: "**/*.py"
-      instructions: "No print() in production. Use logging. No bare except. Files < 600 lines."
+      instructions: >
+        No print() in production. Use logging. No bare except. Files < 600 lines.
+        Flag stub returns (return [], return {}, return None) without TODO marker.
+        Flag empty catch/except blocks that swallow errors.
     - path: "**/*.ts"
-      instructions: "No any types (use unknown). No console.log. No commented-out code."
+      instructions: >
+        No any types (use unknown). No console.log. No commented-out code.
+        Flag stub returns (return [], return {}, return null, return '') in non-test files.
+        Flag empty catch blocks that swallow errors.
+        Flag .where().where() chaining in Drizzle (must use and()).
+        Flag import Redis from 'ioredis' (must use { Redis }).
     - path: "**/*.tsx"
-      instructions: "No any types (use unknown). No console.log. No commented-out code."
+      instructions: >
+        No any types (use unknown). No console.log. No commented-out code.
+        Flag hardcoded strings where env vars or config should be used.
     - path: "scripts/**"
-      instructions: "Scripts must be idempotent and exit non-zero on failure."
+      instructions: >
+        Scripts must be idempotent and exit non-zero on failure.
+        Flag sed/awk parsing of source code regexes (use Python instead).
     - path: "docs/**"
-      instructions: "Check factual accuracy. Flag stale dates or broken links."
+      instructions: >
+        Check factual accuracy. Flag stale dates or broken links.
+        Verify any claimed feature exists in the codebase.
+    - path: "apps/api/src/routes/**"
+      instructions: >
+        Verify response shape matches documented API contracts.
+        Flag route handlers that parse but don't persist (ingest anti-pattern).
+        Check auth enforcement — no route should be unprotected unless explicitly public.
+    - path: "packages/shared-llm/**"
+      instructions: >
+        Flag JSON.parse() on raw LLM output (use multi-strategy extractor).
+        Flag || with LLM response fields (use ?? nullish coalescing).
+        Verify timeout hierarchy: agent < executor < HTTP.
+    - path: ".github/workflows/**"
+      instructions: >
+        Verify AUTH_MODE=strict in CI (never AUTH_MODE=open).
+        Check that env vars are set for both Railway and Vercel.
 chat:
   auto_reply: true
 tone_instructions: >
-  Direct and technical. Flag hallucination risks (phantom imports, fabricated APIs).
-  Multi-LLM codebase — different AIs write and review code.
+  Direct and technical. This is a multi-LLM codebase (Claude, Codex, Cursor, Gemini).
+  Flag hallucination risks: phantom imports, fabricated APIs, stub functions, empty catches.
+  Flag anti-patterns from the Learning Journal (docs/LEARNING_JOURNAL.md).
+  Every claimed behavior must have evidence (test output, curl, screenshot).
+  If you see a pattern that has been flagged 3+ times in feedback, recommend escalation
+  to an automated check (ESLint rule, CI script, or git hook).

@@ -2,9 +2,9 @@
 # Check PR template: verify PR body contains required sections.
 #
 # WHY: Enforces consistent PR descriptions so reviewers (human and LLM) have
-#      sufficient context. Required sections: Summary, Risk Level, Test Plan.
+#      sufficient context. Required by LLM Coding Framework (6 pillars).
 # HOW: Reads PR body from $GITHUB_EVENT_PATH (GitHub Actions event JSON),
-#      checks for ## Summary, ## Risk Level, ## Test Plan headings.
+#      checks for required section headings from the framework PR template.
 #
 # USAGE: bash scripts/check-pr-template.sh
 # EXIT: 0 = pass (all sections present or not a PR), 1 = missing sections
@@ -57,16 +57,16 @@ except Exception:
   fi
 
   echo "❌ check-pr-template: PR body is empty"
-  echo "   Required sections: ## Summary, ## Risk Level, ## Test Plan"
+  echo "   Required sections: ## Summary, ## Risk Level, ## Test Plan, ## Proof, ## Maker LLM, ## Task Contract"
   exit 1
 fi
 
 MISSING=0
 
 # Check for required sections (case-insensitive heading match)
-for section in "Summary" "Risk Level" "Test Plan"; do
+for section in "Summary" "Risk Level" "Test Plan" "Proof" "Maker LLM" "Task Contract"; do
   if ! echo "$PR_BODY" | grep -qi "^##[[:space:]]*${section}"; then
-    echo "❌ Missing required section: ## $section"
+    echo "  Missing required section: ## $section"
     MISSING=$((MISSING + 1))
   fi
 done
@@ -74,7 +74,7 @@ done
 if [ "$MISSING" -gt 0 ]; then
   echo ""
   echo "❌ check-pr-template: $MISSING required section(s) missing from PR description"
-  echo "   Every PR must include: ## Summary, ## Risk Level, ## Test Plan"
+  echo "   Every PR must include: ## Summary, ## Risk Level, ## Test Plan, ## Proof, ## Maker LLM, ## Task Contract"
   exit 1
 fi
 
