@@ -404,6 +404,251 @@ Get the status of a fine-tuning job.
 
 ---
 
+### `POST /api/generations`
+
+Log an AI generation to the `ai_generations` table (§21 Plane 3).
+
+**Request body:**
+```json
+{
+  "userId": "user-123",
+  "sessionId": "sess-abc",
+  "promptText": "You are a job classifier...",
+  "promptVersion": "v1.2.0",
+  "taskType": "classification",
+  "inputTokens": 150,
+  "responseText": "This is a software engineering role...",
+  "outputTokens": 50,
+  "model": "claude-sonnet",
+  "modelVersion": "claude-sonnet-4-6",
+  "latencyMs": 1200,
+  "costUsd": 0.003,
+  "qualityScore": 0.85,
+  "hallucination": false,
+  "guardrailTriggered": []
+}
+```
+
+**Response** `201`: The created generation row.
+
+**Response** `400`:
+```json
+{ "error": "Required field missing: promptText" }
+```
+
+---
+
+### `GET /api/generations?userId=...&limit=20&offset=0`
+
+Query AI generation history for a user with pagination.
+
+**Query params:**
+- `userId` — required
+- `limit` — max 100, default 20
+- `offset` — default 0
+
+**Response** `200`: Array of `ai_generations` rows, ordered by `created_at` descending.
+
+---
+
+### `GET /api/generations/stats?userId=...&days=7`
+
+Aggregated generation stats for a user over the last N days.
+
+**Query params:**
+- `userId` — required
+- `days` — default 7
+
+**Response** `200`:
+```json
+{
+  "totalCalls": 42,
+  "avgLatencyMs": 1150,
+  "avgQualityScore": 0.82,
+  "totalCostUsd": 0.156
+}
+```
+
+---
+
+### `PATCH /api/feedback/:generationId`
+
+Update feedback on an AI generation. Provide at least one of the feedback fields.
+
+**Path params:**
+- `generationId` — UUID of the generation
+
+**Request body:**
+```json
+{
+  "userFeedback": "accepted",
+  "thumbs": 1,
+  "userEditDiff": "Changed 'software' to 'data science'"
+}
+```
+
+Valid `userFeedback` values: `accepted`, `rejected`, `edited`, `regenerated`, `ignored`.
+Valid `thumbs` values: `-1`, `0`, `1`.
+
+**Response** `200`: The updated generation row.
+
+**Response** `400`:
+```json
+{ "error": "Provide at least one of: userFeedback, thumbs, userEditDiff" }
+```
+
+**Response** `404`:
+```json
+{ "error": "Generation not found: <id>" }
+```
+
+---
+
+### `POST /api/feedback/:generationId/outcome`
+
+Create an outcome record linked to an AI generation (§22 Moat Tracking).
+
+**Path params:**
+- `generationId` — UUID of the generation
+
+**Request body:**
+```json
+{
+  "userId": "user-123",
+  "outcomeType": "conversion",
+  "outcomeValue": { "applied": true, "source": "recommendation" }
+}
+```
+
+Valid `outcomeType` values: `conversion`, `task_completed`, `abandoned`.
+
+**Response** `201`: The created outcome row.
+
+**Response** `404`:
+```json
+{ "error": "Generation not found: <id>" }
+```
+
+---
+
+### `POST /api/documents`
+
+Ingest a document: chunks content, generates embeddings via LiteLLM, stores both.
+Dedup via SHA-256 content hash — returns existing doc if duplicate.
+Fail-open: if embedding generation fails, document stored with `chunkCount: 0`.
+
+**Request body:**
+```json
+{
+  "title": "Job Description Template",
+  "content": "Full text content to be chunked and embedded...",
+  "sourceUrl": "https://example.com/jd.pdf",
+  "mimeType": "text/plain",
+  "modelId": "text-embedding-3-small",
+  "validUntil": "2026-06-01T00:00:00Z",
+  "metadata": { "department": "engineering" }
+}
+```
+
+**Response** `201`:
+```json
+{
+  "document": { "id": "uuid", "title": "...", "chunkCount": 4, "..." },
+  "chunksCreated": 4,
+  "embeddingsGenerated": true
+}
+```
+
+**Response** `200` (duplicate):
+```json
+{ "duplicate": true, "document": { "..." } }
+```
+
+---
+
+### `GET /api/documents?limit=20&offset=0`
+
+List ingested documents, ordered by ingestion date descending.
+
+**Query params:**
+- `limit` — max 100, default 20
+- `offset` — default 0
+
+**Response** `200`: Array of document rows.
+
+---
+
+### `GET /api/documents/:id`
+
+Get single document metadata.
+
+**Path params:**
+- `id` — Document UUID
+
+**Response** `200`: Document row.
+
+**Response** `404`:
+```json
+{ "error": "Document not found: <id>" }
+```
+
+---
+
+### `GET /api/embeddings/search?q=...&limit=10&modelId=...`
+
+Semantic search via pgvector cosine similarity.
+§19 HARD GATE: `modelId` is **required** — never mix vectors from different models.
+
+**Query params:**
+- `q` — Search query (required)
+- `modelId` — Embedding model ID (required)
+- `limit` — max 50, default 10
+
+**Response** `200`:
+```json
+[
+  {
+    "id": "uuid",
+    "source_type": "document",
+    "source_id": "doc-uuid",
+    "metadata": { "chunkIndex": 0, "documentTitle": "..." },
+    "similarity": 0.87
+  }
+]
+```
+
+**Response** `400`:
+```json
+{ "error": "Required query param: modelId (§19 HARD GATE: never mix vectors from different models)" }
+```
+
+**Response** `502`:
+```json
+{ "error": "Failed to generate query embedding — LiteLLM proxy may be unavailable" }
+```
+
+---
+
+### `POST /api/embeddings`
+
+Direct embedding insertion (for pre-computed embeddings).
+
+**Request body:**
+```json
+{
+  "sourceType": "document",
+  "sourceId": "doc-uuid",
+  "contentHash": "sha256...",
+  "embedding": [0.1, 0.2, ...],
+  "modelId": "text-embedding-3-small",
+  "metadata": { "chunkIndex": 0 }
+}
+```
+
+**Response** `201`: The created embedding row.
+
+---
+
 ## Cost Budget Guard
 
 Cost budget enforcement on `/api/chat*` and `/api/generate*` routes (after rate limiter):

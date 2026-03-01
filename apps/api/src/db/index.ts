@@ -9,4 +9,7 @@ export {
   promptVersions,
   aiGenerations,
   embeddings,
+  documents,
+  userPreferences,
+  outcomes,
 } from './schema.js';

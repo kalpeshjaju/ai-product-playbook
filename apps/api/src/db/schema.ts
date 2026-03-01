@@ -6,11 +6,11 @@
  *
  * HOW: Drizzle ORM schema definitions. Run `npm run db:push` to sync to DB.
  *
- * DEFERRED: user_preferences, match_quality_signals, outcomes tables
- *           → Month 3–6+ per §20 Layer Investment Sequencing.
+ * Tables: prompt_versions, ai_generations, embeddings, documents,
+ *         user_preferences, outcomes.
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-02-28
+ * LAST UPDATED: 2026-03-01
  */
 
 import {
@@ -135,5 +135,68 @@ export const embeddings = pgTable(
     // CREATE INDEX idx_embeddings_hnsw ON embeddings
     //   USING hnsw (embedding vector_cosine_ops);
     sql`-- HNSW index: run CREATE INDEX idx_embeddings_hnsw ON embeddings USING hnsw (embedding vector_cosine_ops) after migration`,
+  ],
+);
+
+// ─── Table 4: documents (§19 Input Pillar) ──────────────────────────────────
+// Tracks ingested documents with content hashing for dedup,
+// chunk count for embedding status, and freshness via validUntil.
+export const documents = pgTable(
+  'documents',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    title: text('title').notNull(),
+    sourceUrl: text('source_url'),
+    mimeType: text('mime_type').notNull().default('text/plain'),
+    contentHash: text('content_hash').notNull(),
+    chunkCount: integer('chunk_count').default(0).notNull(),
+    embeddingModelId: text('embedding_model_id'),
+    ingestedAt: timestamp('ingested_at', { withTimezone: true }).defaultNow().notNull(),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    metadata: jsonb('metadata'),
+  },
+  (table) => [
+    index('idx_documents_hash').on(table.contentHash),
+    index('idx_documents_ingested').on(table.ingestedAt),
+  ],
+);
+
+// ─── Table 5: user_preferences (§20 Layer 4 Personalization) ────────────────
+// Stores per-user preferences with source tracking (explicit vs inferred).
+// Confidence score enables gradual preference learning from feedback data.
+export const userPreferences = pgTable(
+  'user_preferences',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    preferenceKey: text('preference_key').notNull(),
+    preferenceValue: jsonb('preference_value').notNull(),
+    source: text('source').notNull().default('default'), // explicit | inferred | default
+    confidence: numeric('confidence', { precision: 3, scale: 2 }).default('1.00'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_user_prefs_user').on(table.userId),
+    unique('uq_user_pref_key').on(table.userId, table.preferenceKey),
+  ],
+);
+
+// ─── Table 6: outcomes (§22 Moat Tracking) ──────────────────────────────────
+// Links AI generation results to business outcomes for feedback loops.
+// outcomeType tracks the nature; outcomeValue holds structured details.
+export const outcomes = pgTable(
+  'outcomes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    generationId: uuid('generation_id').notNull().references(() => aiGenerations.id),
+    userId: text('user_id').notNull(),
+    outcomeType: text('outcome_type').notNull(), // conversion | task_completed | abandoned
+    outcomeValue: jsonb('outcome_value'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_outcomes_generation').on(table.generationId),
+    index('idx_outcomes_user').on(table.userId, table.createdAt),
   ],
 );

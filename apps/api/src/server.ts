@@ -21,6 +21,10 @@ import { handleCostRoutes } from './routes/costs.js';
 import { handleMemoryRoutes } from './routes/memory.js';
 import { handleComposioRoutes } from './routes/composio.js';
 import { handleOpenPipeRoutes } from './routes/openpipe.js';
+import { handleGenerationRoutes } from './routes/generations.js';
+import { handleFeedbackRoutes } from './routes/feedback.js';
+import { handleDocumentRoutes } from './routes/documents.js';
+import { handleEmbeddingRoutes } from './routes/embeddings.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 
 // Sentry — no-op when DSN not set
@@ -153,6 +157,30 @@ const server = createServer(async (req, res) => {
   // ─── Tier 2: OpenPipe routes ───
   if (url.startsWith('/api/openpipe')) {
     await handleOpenPipeRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── AI Generation logging (§21 Plane 3) ───
+  if (url.startsWith('/api/generations')) {
+    await handleGenerationRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Feedback + Outcomes (§22) ───
+  if (url.startsWith('/api/feedback')) {
+    await handleFeedbackRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Document ingestion (§19 INPUT pillar) ───
+  if (url.startsWith('/api/documents')) {
+    await handleDocumentRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Embedding search (§19) ───
+  if (url.startsWith('/api/embeddings')) {
+    await handleEmbeddingRoutes(req, res, url, parseBody);
     return;
   }
 

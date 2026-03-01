@@ -5,7 +5,7 @@
  *      Import: `import { createLLMClient, extractJson, costLedger } from '@playbook/shared-llm'`
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-02-28
+ * LAST UPDATED: 2026-03-01
  */
 
 export { createLLMClient } from './llm-client.js';
@@ -62,6 +62,14 @@ export type {
   GuardrailScanner,
   ScanConfig,
 } from './guardrails/index.js';
+
+// ─── Analytics Event Catalog ─────────────────────────────────────────────────
+export { EVENTS } from './analytics/index.js';
+export type { EventName, EventProperties } from './analytics/index.js';
+
+// ─── AI Generation Logging (§21 Plane 3) ────────────────────────────────────
+export { createGenerationLog } from './generation-logger.js';
+export type { GenerationLogInput, GenerationLogRecord } from './generation-logger.js';
 
 // ─── Tier 1: Identity Tracking (§21) ────────────────────────────────────────
 export {
