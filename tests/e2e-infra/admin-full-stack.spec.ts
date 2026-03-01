@@ -34,7 +34,7 @@ test.describe('Admin App — Full Stack', () => {
     await page.goto('/memory');
     await expect(page.getByRole('heading', { name: 'Memory Browser' })).toBeVisible();
     // The memory browser has a userId input field
-    await expect(page.getByRole('textbox')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('textbox', { name: 'User ID:' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('admin cost dashboard loads with real data', async ({ page }) => {
