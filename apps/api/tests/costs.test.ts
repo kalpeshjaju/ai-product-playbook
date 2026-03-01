@@ -80,23 +80,12 @@ describe('handleCostRoutes', () => {
     expect(mockGetObservabilityReport).toHaveBeenCalledOnce();
   });
 
-  // POST /api/costs/reset — invalid admin key
-  it('POST /api/costs/reset returns 403 for invalid admin key', () => {
-    const req = createMockReq('POST', { 'x-admin-key': 'wrong-key' });
-    const res = createMockRes();
-    handleCostRoutes(req, res, '/api/costs/reset');
-
-    expect(res._statusCode).toBe(403);
-    expect(res._body).toContain('Forbidden');
-    expect(mockReset).not.toHaveBeenCalled();
-  });
-
-  // POST /api/costs/reset — valid admin key
-  it('POST /api/costs/reset resets costs when admin key is valid', () => {
+  // POST /api/costs/reset — auth enforced by middleware, route just resets
+  it('POST /api/costs/reset resets costs', () => {
     const postResetReport = { totalCostUsd: 0, callCount: 0, modelBreakdown: {} };
     mockGetReport.mockReturnValue(postResetReport);
 
-    const req = createMockReq('POST', { 'x-admin-key': 'test-admin-key' });
+    const req = createMockReq('POST');
     const res = createMockRes();
     handleCostRoutes(req, res, '/api/costs/reset');
 

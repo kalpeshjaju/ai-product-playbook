@@ -25,6 +25,14 @@ vi.mock('../src/middleware/turnstile.js', () => ({
   verifyTurnstileToken: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('../src/middleware/auth.js', () => ({
+  authenticateRequest: vi.fn().mockReturnValue({
+    userContext: { userId: 'test-user', source: 'api_key' },
+    tier: 'user',
+  }),
+  verifyUserOwnership: vi.fn().mockReturnValue(true),
+}));
+
 vi.mock('../src/middleware/posthog.js', () => ({
   initPostHogServer: vi.fn(),
   shutdownPostHog: vi.fn().mockResolvedValue(undefined),

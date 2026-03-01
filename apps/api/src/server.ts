@@ -29,6 +29,7 @@ import { handleEmbeddingRoutes } from './routes/embeddings.js';
 import { handlePreferenceRoutes } from './routes/preferences.js';
 import { handleTranscriptionRoutes } from './routes/transcription.js';
 import { handleFewShotRoutes } from './routes/few-shot.js';
+import { authenticateRequest, verifyUserOwnership } from './middleware/auth.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 import { db } from './db/index.js';
 import { closeDatabase } from './db/connection.js';
@@ -117,6 +118,48 @@ const server = createServer(async (req, res) => {
   }
 
   const url = req.url ?? '';
+
+  // ─── Health check (before auth — used by load balancers and Docker HEALTHCHECK) ───
+  if (url === '/api/health') {
+    const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+    let dbStatus: 'ok' | 'unreachable' = 'unreachable';
+
+    try {
+      await db.execute(sql`SELECT 1`);
+      dbStatus = 'ok';
+    } catch {
+      // DB unreachable
+    }
+
+    const status = dbStatus === 'ok' ? 'ok' : 'degraded';
+    const statusCode = dbStatus === 'ok' ? 200 : 503;
+
+    res.statusCode = statusCode;
+    res.end(JSON.stringify({
+      status,
+      timestamp: new Date().toISOString(),
+      uptimeSeconds,
+      services: {
+        database: dbStatus,
+      },
+    }));
+    return;
+  }
+
+  // ─── Authentication (API key validation) ───
+  const authResult = authenticateRequest(req, res, url);
+  if (!authResult) return; // 401/403 already sent
+
+  // ─── IDOR prevention (user-scoped routes) ───
+  if (authResult.tier === 'user') {
+    if (!verifyUserOwnership(url, authResult.userContext.userId)) {
+      res.statusCode = 403;
+      res.end(JSON.stringify({
+        error: 'Forbidden: you can only access your own data',
+      }));
+      return;
+    }
+  }
 
   // ─── Turnstile bot protection on /api/chat* routes (§18 Denial-of-Wallet) ───
   if (url.startsWith('/api/chat')) {
@@ -228,33 +271,6 @@ const server = createServer(async (req, res) => {
   // ─── Few-shot bank (§20 STRATEGY) ───
   if (url.startsWith('/api/few-shot')) {
     await handleFewShotRoutes(req, res, url, parseBody);
-    return;
-  }
-
-  // ─── Health check with DB ping ───
-  if (url === '/api/health') {
-    const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-    let dbStatus: 'ok' | 'unreachable' = 'unreachable';
-
-    try {
-      await db.execute(sql`SELECT 1`);
-      dbStatus = 'ok';
-    } catch {
-      // DB unreachable
-    }
-
-    const status = dbStatus === 'ok' ? 'ok' : 'degraded';
-    const statusCode = dbStatus === 'ok' ? 200 : 503;
-
-    res.statusCode = statusCode;
-    res.end(JSON.stringify({
-      status,
-      timestamp: new Date().toISOString(),
-      uptimeSeconds,
-      services: {
-        database: dbStatus,
-      },
-    }));
     return;
   }
 

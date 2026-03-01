@@ -28,17 +28,8 @@ export function handleCostRoutes(
     return;
   }
 
-  // POST /api/costs/reset — admin-only reset
+  // POST /api/costs/reset — admin-only (auth enforced by middleware)
   if (url === '/api/costs/reset' && req.method === 'POST') {
-    const adminKey = process.env.ADMIN_API_KEY;
-    const provided = req.headers['x-admin-key'];
-
-    if (!adminKey || typeof provided !== 'string' || provided !== adminKey) {
-      res.statusCode = 403;
-      res.end(JSON.stringify({ error: 'Forbidden: invalid or missing x-admin-key' }));
-      return;
-    }
-
     costLedger.reset();
     res.end(JSON.stringify({ status: 'reset', report: costLedger.getReport() }));
     return;
