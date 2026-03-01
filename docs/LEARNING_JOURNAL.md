@@ -87,6 +87,35 @@ Vercel deploy-specific URLs (with commit hash) have deploy protection enabled �
 
 ---
 
+## 2026-03-01 — P0/P1 Security Hardening (Auth Lockdown + Key Hashing)
+
+### What changed
+- SHA-256 hashed API keys in `shared-llm/identity/context.ts` — raw keys never reach logs/Redis/Langfuse
+- Replaced implicit fail-open auth with explicit `AUTH_MODE` env var (strict/open)
+- Added `API_INTERNAL_KEY` for Vercel→Railway service-to-service auth
+- Override `body.userId` with authenticated identity on write endpoints (generations, embeddings)
+- CI npm audit now blocking with expiry-aware allowlist (`scripts/audit-with-allowlist.js`)
+- 25 files changed, 316 insertions, 58 deletions — all 330+ tests pass
+
+### What failed / what worked
+- **Failed:** `railway up --detach` deploys local code but doesn't wait for rollover — old deployment kept serving `AUTH_MODE=open` for ~2min. Had to check `railway logs` to confirm the new deployment was active before verifying auth enforcement.
+- **Failed:** Manual `vercel deploy` from CLI fails in monorepo (missing lockfile in subdirectory). Git-triggered deploys work fine — don't use Vercel CLI for deployments.
+- **Failed:** Forgot to set `NEXT_PUBLIC_API_URL` on Vercel — frontends defaulted to `localhost:3002`. Always check env vars on both Railway AND Vercel.
+- **Worked:** Adding `authResult` parameter to route handlers (same pattern as existing `handleFeedbackRoutes`) — clean, no refactor needed.
+- **Worked:** Hallucination-check hook caught real issues but also had false positives for TypeScript ESM `.js`→`.ts` resolution and React `return null` — fixed the hook.
+
+### Lesson learned
+When flipping env vars on Railway, always check `railway logs` for the startup message to confirm the new deployment is active. The old deployment continues serving until the new build completes and replaces it — there's a 1-3 minute overlap.
+
+### Validation
+- `curl /api/costs` (no auth) → 401 "Authentication required"
+- `curl -H 'x-api-key: <key>' /api/costs` → 200 with cost data
+- `curl /api/health` → 200 (public, no auth)
+- Web + admin pages load costs/prompts without "Could not load" errors
+- `npx turbo run type-check test --force` — all 9 type-checks + 4 test suites pass
+
+---
+
 ## Anti-Pattern Registry
 
 > Quick-reference table. Add a row when you discover a new anti-pattern.
@@ -111,3 +140,6 @@ Vercel deploy-specific URLs (with commit hash) have deploy protection enabled �
 | Put `--ignore-scripts` in vercel.json installCommand | `vercel build` ignores local vercel.json, uses pulled settings | Add `needrestart` removal step in the deploy workflow itself | 2026-03-01 |
 | Import from workspace package without declaring dependency | turbo skips building the package; build fails in CI | Always add `"@playbook/<pkg>": "*"` to package.json dependencies | 2026-03-01 |
 | Duplicate shared components in app-local `src/components/` | Drift between apps, violates shared-ui contract | Put shared components in `packages/shared-ui`, import from `@playbook/shared-ui` | 2026-03-01 |
+| Assume `railway up` rollover is instant | Old deployment serves for 1-3min after `railway up --detach` | Check `railway logs` for startup message before verifying env var changes | 2026-03-01 |
+| Deploy Vercel via CLI in monorepo | `npm ci` fails — lockfile at root, not app subdir | Use git-triggered deploys only; never `vercel deploy` from CLI | 2026-03-01 |
+| Set Railway env var but forget Vercel `NEXT_PUBLIC_*` | Frontend defaults to localhost, silently fails to load data | Env var checklist: Railway API vars + Vercel `NEXT_PUBLIC_API_URL` + `API_INTERNAL_KEY` | 2026-03-01 |
