@@ -14,3 +14,17 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      - id: impact-graph
+        name: Change impact analysis (pre-push)
+        entry: bash scripts/impact-graph.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: type-check
+        name: TypeScript type-check (pre-push)
+        entry: bash -c 'npx turbo run type-check 2>&1 | tail -20'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

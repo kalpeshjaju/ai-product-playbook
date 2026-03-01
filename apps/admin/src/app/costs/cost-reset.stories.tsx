@@ -7,7 +7,7 @@
  * LAST UPDATED: 2026-03-01
  */
 
-import type { Meta, StoryObj } from '@storybook/nextjs';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { CostReset } from './cost-reset';
 
 const meta: Meta<typeof CostReset> = {

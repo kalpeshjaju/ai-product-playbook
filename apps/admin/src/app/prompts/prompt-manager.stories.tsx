@@ -7,7 +7,7 @@
  * LAST UPDATED: 2026-03-01
  */
 
-import type { Meta, StoryObj } from '@storybook/nextjs';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { PromptManager } from './prompt-manager';
 
 const meta: Meta<typeof PromptManager> = {
