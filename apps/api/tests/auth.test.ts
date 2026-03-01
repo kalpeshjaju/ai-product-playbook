@@ -56,8 +56,8 @@ describe('getRequiredTier', () => {
     expect(getRequiredTier('/api/entries', 'GET')).toBe('public');
   });
 
-  it('returns public for GET /api/users', () => {
-    expect(getRequiredTier('/api/users', 'GET')).toBe('public');
+  it('returns admin for GET /api/users', () => {
+    expect(getRequiredTier('/api/users', 'GET')).toBe('admin');
   });
 
   it('returns admin for POST /api/prompts', () => {

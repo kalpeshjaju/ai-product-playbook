@@ -98,10 +98,11 @@ const server = createServer(async (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', requestOrigin);
     }
     // If origin is not in the allowed list, don't set the header (browser will block)
-  } else {
-    // Fallback: allow all origins when ALLOWED_ORIGINS not configured
+  } else if (process.env.NODE_ENV !== 'production') {
+    // Dev/test: allow all origins when ALLOWED_ORIGINS not configured
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
+  // Production without ALLOWED_ORIGINS: no ACAO header → browser blocks cross-origin
 
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-turnstile-token, x-admin-key');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
