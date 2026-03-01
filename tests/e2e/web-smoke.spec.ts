@@ -26,4 +26,9 @@ test.describe('Web App Smoke Tests', () => {
     await page.goto('/costs');
     await expect(page).toHaveURL(/\/costs/);
   });
+
+  test('prompts page loads without crash', async ({ page }) => {
+    await page.goto('/prompts');
+    await expect(page).toHaveURL(/\/prompts/);
+  });
 });

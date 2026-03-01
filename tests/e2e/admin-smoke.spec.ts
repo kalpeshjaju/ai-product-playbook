@@ -23,4 +23,14 @@ test.describe('Admin App Smoke Tests', () => {
     await page.goto(`${ADMIN_URL}/memory`);
     await expect(page.getByRole('heading', { name: 'Memory Browser' })).toBeVisible();
   });
+
+  test('prompts page loads', async ({ page }) => {
+    await page.goto(`${ADMIN_URL}/prompts`);
+    await expect(page).toHaveURL(/\/prompts/);
+  });
+
+  test('costs page loads', async ({ page }) => {
+    await page.goto(`${ADMIN_URL}/costs`);
+    await expect(page).toHaveURL(/\/costs/);
+  });
 });
