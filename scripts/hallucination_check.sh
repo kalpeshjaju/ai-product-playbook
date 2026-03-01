@@ -55,11 +55,11 @@ if [ -n "$BASE_BRANCH" ]; then
 else
   # Scan common source directories
   CHANGED_PY=""
-  for dir in src backend lib app packages; do
+  for dir in src backend lib app apps packages; do
     [ -d "$dir" ] && CHANGED_PY+=$(find "$dir" -name "*.py" -type f 2>/dev/null)$'\n'
   done
   CHANGED_TS=""
-  for dir in src frontend lib app packages; do
+  for dir in src frontend lib app apps packages; do
     [ -d "$dir" ] && CHANGED_TS+=$(find "$dir" \( -name "*.ts" -o -name "*.tsx" \) -type f 2>/dev/null | grep -v node_modules)$'\n'
   done
   CHANGED_ALL="$CHANGED_PY"$'\n'"$CHANGED_TS"

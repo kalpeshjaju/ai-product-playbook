@@ -2,9 +2,9 @@
 # Check PR template: verify PR body contains required sections.
 #
 # WHY: Enforces consistent PR descriptions so reviewers (human and LLM) have
-#      sufficient context. Required sections: What, Why, Test.
+#      sufficient context. Required sections: Summary, Risk Level, Test Plan.
 # HOW: Reads PR body from $GITHUB_EVENT_PATH (GitHub Actions event JSON),
-#      checks for ## What, ## Why, ## Test headings.
+#      checks for ## Summary, ## Risk Level, ## Test Plan headings.
 #
 # USAGE: bash scripts/check-pr-template.sh
 # EXIT: 0 = pass (all sections present or not a PR), 1 = missing sections
@@ -57,14 +57,14 @@ except Exception:
   fi
 
   echo "❌ check-pr-template: PR body is empty"
-  echo "   Required sections: ## What, ## Why, ## Test"
+  echo "   Required sections: ## Summary, ## Risk Level, ## Test Plan"
   exit 1
 fi
 
 MISSING=0
 
 # Check for required sections (case-insensitive heading match)
-for section in "What" "Why" "Test"; do
+for section in "Summary" "Risk Level" "Test Plan"; do
   if ! echo "$PR_BODY" | grep -qi "^##[[:space:]]*${section}"; then
     echo "❌ Missing required section: ## $section"
     MISSING=$((MISSING + 1))
@@ -74,7 +74,7 @@ done
 if [ "$MISSING" -gt 0 ]; then
   echo ""
   echo "❌ check-pr-template: $MISSING required section(s) missing from PR description"
-  echo "   Every PR must include: ## What, ## Why, ## Test"
+  echo "   Every PR must include: ## Summary, ## Risk Level, ## Test Plan"
   exit 1
 fi
 

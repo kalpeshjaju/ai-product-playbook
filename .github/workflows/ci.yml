@@ -77,6 +77,13 @@ jobs:
         if: github.event_name == 'pull_request'
         run: bash scripts/check-pr-template.sh
 
+      # Preview deploy verification (PR-only, UI changes)
+      - name: Check preview deploy
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-preview-deploy.sh
+        env:
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+
       # Hallucination detection
       - name: Hallucination check
         if: github.event_name == 'pull_request'

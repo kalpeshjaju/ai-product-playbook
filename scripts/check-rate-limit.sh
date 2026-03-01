@@ -4,7 +4,12 @@
 # Source: Playbook §18 line 3984.
 set -euo pipefail
 
-LLM_FILES=$(grep -rl 'llm\.chat\|streamText\|generateText' src/ --include='*.ts' 2>/dev/null || true)
+LLM_FILES=""
+for dir in apps/ packages/; do
+  if [ -d "$dir" ]; then
+    LLM_FILES+=$(grep -rl 'llm\.chat\|streamText\|generateText' "$dir" --include='*.ts' --include='*.tsx' 2>/dev/null || true)
+  fi
+done
 
 if [ -z "$LLM_FILES" ]; then
   echo "✅ check-rate-limit: no LLM call sites found (pass)"

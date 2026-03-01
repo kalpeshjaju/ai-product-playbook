@@ -11,3 +11,6 @@
 
 export { StatusBadge } from './status-badge.js';
 export type { StatusBadgeProps } from './status-badge.js';
+
+export { DataCard } from './data-card.js';
+export type { DataCardProps } from './data-card.js';
