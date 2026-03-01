@@ -107,12 +107,10 @@ export function chunkSemantic(text: string, chunkSize = 2000, overlap = 200): st
     if (seg.isHeading && currentParts.length > 0) {
       chunks.push(currentParts.join(' ').trimEnd());
       // Calculate overlap segments for the next chunk
-      const overlapParts = computeOverlapParts(segments, currentSegmentIndices, overlap);
-      currentParts = overlapParts.length > 0 ? [...overlapParts, seg.text] : [seg.text];
+      const { parts: olParts, indices: olIndices } = computeOverlap(segments, currentSegmentIndices, overlap);
+      currentParts = olParts.length > 0 ? [...olParts, seg.text] : [seg.text];
       currentLength = currentParts.join(' ').length;
-      currentSegmentIndices = overlapParts.length > 0
-        ? [...computeOverlapIndices(segments, currentSegmentIndices, overlap), i]
-        : [i];
+      currentSegmentIndices = olParts.length > 0 ? [...olIndices, i] : [i];
       continue;
     }
 
@@ -129,12 +127,11 @@ export function chunkSemantic(text: string, chunkSize = 2000, overlap = 200): st
         chunks.push(currentParts.join(' ').trimEnd());
 
         // Build overlap from trailing segments of the just-finished chunk
-        const overlapParts = computeOverlapParts(segments, currentSegmentIndices, overlap);
-        const overlapIndices = computeOverlapIndices(segments, currentSegmentIndices, overlap);
+        const { parts: olParts, indices: olIndices } = computeOverlap(segments, currentSegmentIndices, overlap);
 
-        if (overlap > 0 && overlapParts.length > 0) {
-          currentParts = [...overlapParts, seg.text];
-          currentSegmentIndices = [...overlapIndices, i];
+        if (overlap > 0 && olParts.length > 0) {
+          currentParts = [...olParts, seg.text];
+          currentSegmentIndices = [...olIndices, i];
         } else {
           currentParts = [seg.text];
           currentSegmentIndices = [i];
@@ -158,18 +155,26 @@ export function chunkSemantic(text: string, chunkSize = 2000, overlap = 200): st
   return chunks;
 }
 
+/** Result of computing overlap: the trailing segment texts and their indices. */
+interface OverlapResult {
+  parts: string[];
+  indices: number[];
+}
+
 /**
  * Given the segments in the just-completed chunk, walk backwards and collect
- * trailing segment texts whose combined length is within the overlap budget.
+ * trailing segment texts (and their indices) whose combined length is within
+ * the overlap budget.
  */
-function computeOverlapParts(
+function computeOverlap(
   segments: Segment[],
   chunkIndices: number[],
   overlap: number,
-): string[] {
-  if (overlap <= 0 || chunkIndices.length === 0) return [];
+): OverlapResult {
+  if (overlap <= 0 || chunkIndices.length === 0) return { parts: [], indices: [] };
 
   const parts: string[] = [];
+  const indices: number[] = [];
   let totalLength = 0;
 
   for (let j = chunkIndices.length - 1; j >= 0; j--) {
@@ -181,36 +186,9 @@ function computeOverlapParts(
 
     if (candidateLength > overlap && parts.length > 0) break;
     parts.unshift(segText);
-    totalLength = candidateLength;
-  }
-
-  return parts;
-}
-
-/**
- * Same as computeOverlapParts but returns the segment indices instead of text.
- */
-function computeOverlapIndices(
-  segments: Segment[],
-  chunkIndices: number[],
-  overlap: number,
-): number[] {
-  if (overlap <= 0 || chunkIndices.length === 0) return [];
-
-  const indices: number[] = [];
-  let totalLength = 0;
-
-  for (let j = chunkIndices.length - 1; j >= 0; j--) {
-    const segIdx = chunkIndices[j]!;
-    const segText = segments[segIdx]!.text;
-    const candidateLength = totalLength === 0
-      ? segText.length
-      : totalLength + 1 + segText.length;
-
-    if (candidateLength > overlap && indices.length > 0) break;
     indices.unshift(segIdx);
     totalLength = candidateLength;
   }
 
-  return indices;
+  return { parts, indices };
 }

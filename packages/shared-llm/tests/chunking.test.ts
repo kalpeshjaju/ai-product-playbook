@@ -127,33 +127,21 @@ describe('chunkSemantic', () => {
   });
 
   it('overlap produces chunks with shared content', () => {
-    const sentences = [
-      'First sentence here.',
-      'Second sentence here.',
-      'Third sentence here.',
-      'Fourth sentence here.',
-      'Fifth sentence here.',
-      'Sixth sentence here.',
-      'Seventh sentence here.',
-      'Eighth sentence here.',
-    ];
+    const sentences = Array.from({ length: 8 }, (_, i) =>
+      `Sentence number ${i + 1} here.`
+    );
     const text = sentences.join(' ');
-    // chunkSize small enough to force multiple chunks, overlap > 0
-    const chunks = chunkSemantic(text, 80, 40);
+    const chunks = chunkSemantic(text, 100, 50);
     expect(chunks.length).toBeGreaterThan(1);
-    // Adjacent chunks should share some content (overlap)
+
     for (let i = 0; i < chunks.length - 1; i++) {
       const current = chunks[i]!;
       const next = chunks[i + 1]!;
-      // The end of the current chunk should appear at the start of the next chunk
-      // (overlap means trailing sentences from current are repeated in next)
-      const currentSentences = current.match(/[^.!?]+[.!?]+/g) || [];
-      const nextContent = next;
-      // At least one trailing sentence from current should appear in next
-      const lastSentence = currentSentences[currentSentences.length - 1]?.trim();
-      if (lastSentence) {
-        expect(nextContent).toContain(lastSentence);
-      }
+      // Find any sentence that appears in both chunks (overlap)
+      const sharedSentence = sentences.find(
+        (s) => current.includes(s) && next.includes(s)
+      );
+      expect(sharedSentence).toBeDefined();
     }
   });
 });
