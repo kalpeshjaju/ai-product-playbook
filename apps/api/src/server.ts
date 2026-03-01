@@ -1,9 +1,10 @@
 /**
- * FILE PURPOSE: Minimal API server for infrastructure verification
+ * FILE PURPOSE: Production API server with health checks and graceful shutdown
  *
- * WHY: Proves Railway deploy pipeline works end-to-end.
+ * WHY: Central HTTP server for the AI Product Playbook API.
  * HOW: Native Node.js HTTP server — zero framework deps.
- *      Returns mock data using shared types.
+ *      Real health check with DB ping. CORS origin restriction.
+ *      Graceful shutdown closing all connections.
  *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-03-01
@@ -13,7 +14,7 @@ import * as Sentry from '@sentry/node';
 import { createServer, type IncomingMessage } from 'node:http';
 import type { PlaybookEntry, AdminUser } from '@playbook/shared-types';
 import { createUserContext } from '@playbook/shared-llm';
-import { checkTokenBudget } from './rate-limiter.js';
+import { checkTokenBudget, shutdownRedis } from './rate-limiter.js';
 import { checkCostBudget } from './cost-guard.js';
 import { verifyTurnstileToken } from './middleware/turnstile.js';
 import { handlePromptRoutes } from './routes/prompts.js';
@@ -29,6 +30,9 @@ import { handlePreferenceRoutes } from './routes/preferences.js';
 import { handleTranscriptionRoutes } from './routes/transcription.js';
 import { handleFewShotRoutes } from './routes/few-shot.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
+import { db } from './db/index.js';
+import { closeDatabase } from './db/connection.js';
+import { sql } from 'drizzle-orm';
 
 // Sentry — no-op when DSN not set
 const sentryDsn = process.env.SENTRY_DSN;
@@ -45,6 +49,14 @@ if (sentryDsn) {
 initPostHogServer();
 
 const PORT = parseInt(process.env.PORT ?? '3002', 10);
+const startTime = Date.now();
+
+/** Parse allowed origins from env var (comma-separated). */
+function getAllowedOrigins(): Set<string> | null {
+  const raw = process.env.ALLOWED_ORIGINS;
+  if (!raw) return null;
+  return new Set(raw.split(',').map((o) => o.trim()).filter(Boolean));
+}
 
 const entries: PlaybookEntry[] = [
   { id: '1', title: 'JSON Extraction', summary: 'Multi-strategy repair', category: 'resilience', status: 'active' },
@@ -79,9 +91,23 @@ function getUserId(req: IncomingMessage): string {
 
 const server = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, x-turnstile-token');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+
+  // ─── CORS with origin restriction ───
+  const allowedOrigins = getAllowedOrigins();
+  const requestOrigin = req.headers.origin;
+
+  if (allowedOrigins && requestOrigin) {
+    if (allowedOrigins.has(requestOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    }
+    // If origin is not in the allowed list, don't set the header (browser will block)
+  } else {
+    // Fallback: allow all origins when ALLOWED_ORIGINS not configured
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, x-turnstile-token, x-admin-key');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -205,10 +231,34 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // ─── Existing routes ───
+  // ─── Health check with DB ping ───
   if (url === '/api/health') {
-    res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
-  } else if (url === '/api/entries') {
+    const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+    let dbStatus: 'ok' | 'unreachable' = 'unreachable';
+
+    try {
+      await db.execute(sql`SELECT 1`);
+      dbStatus = 'ok';
+    } catch {
+      // DB unreachable
+    }
+
+    const status = dbStatus === 'ok' ? 'ok' : 'degraded';
+    const statusCode = dbStatus === 'ok' ? 200 : 503;
+
+    res.statusCode = statusCode;
+    res.end(JSON.stringify({
+      status,
+      timestamp: new Date().toISOString(),
+      uptimeSeconds,
+      services: {
+        database: dbStatus,
+      },
+    }));
+    return;
+  }
+
+  if (url === '/api/entries') {
     res.end(JSON.stringify(entries));
   } else if (url === '/api/users') {
     res.end(JSON.stringify(users));
@@ -223,8 +273,38 @@ server.listen(PORT, () => {
   process.stdout.write(`API server running on port ${PORT}\n`);
 });
 
-// Graceful shutdown — flush PostHog events
+// ─── Graceful shutdown — close all connections in order ───
 process.on('SIGTERM', async () => {
-  await shutdownPostHog();
-  server.close();
+  process.stdout.write('SIGTERM received — shutting down gracefully\n');
+
+  // 30s forced exit timeout
+  const forceExitTimer = setTimeout(() => {
+    process.stderr.write('WARN: Graceful shutdown timed out after 30s — forcing exit\n');
+    process.exit(1);
+  }, 30_000);
+  forceExitTimer.unref();
+
+  try {
+    // 1. Stop accepting new connections
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+    process.stdout.write('  Server closed\n');
+
+    // 2. Flush analytics
+    await shutdownPostHog();
+    process.stdout.write('  PostHog flushed\n');
+
+    // 3. Close Redis
+    await shutdownRedis();
+    process.stdout.write('  Redis disconnected\n');
+
+    // 4. Close database
+    await closeDatabase();
+    process.stdout.write('  Database disconnected\n');
+
+    process.stdout.write('Shutdown complete\n');
+  } catch (err) {
+    process.stderr.write(`ERROR during shutdown: ${err}\n`);
+  }
 });

@@ -94,3 +94,15 @@ export async function checkTokenBudget(
     return { allowed: true, remaining: DAILY_TOKEN_BUDGET, limit: DAILY_TOKEN_BUDGET };
   }
 }
+
+/** Disconnect Redis gracefully. Call during server shutdown. */
+export async function shutdownRedis(): Promise<void> {
+  if (redis) {
+    try {
+      await redis.quit();
+    } catch {
+      process.stderr.write('WARN: Error closing Redis connection\n');
+    }
+    redis = null;
+  }
+}

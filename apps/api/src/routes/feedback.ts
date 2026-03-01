@@ -32,6 +32,7 @@ export async function handleFeedbackRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   // POST /api/feedback/:generationId/outcome
   const outcomeMatch = url.match(/^\/api\/feedback\/([^/]+)\/outcome$/);
   if (outcomeMatch && req.method === 'POST') {
@@ -141,4 +142,11 @@ export async function handleFeedbackRoutes(
 
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in feedback routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }

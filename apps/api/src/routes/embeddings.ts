@@ -43,6 +43,7 @@ export async function handleEmbeddingRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   const parsedUrl = new URL(url, 'http://localhost');
   const userCtx = createUserContext(req);
   const langfuseHeaders: Record<string, string> = { ...withLangfuseHeaders(userCtx) };
@@ -125,4 +126,11 @@ export async function handleEmbeddingRoutes(
 
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in embedding routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }

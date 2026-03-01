@@ -51,6 +51,7 @@ export async function handlePromptRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   // GET /api/prompts/:name/active
   const activeMatch = url.match(/^\/api\/prompts\/([^/]+)\/active$/);
   if (activeMatch && req.method === 'GET') {
@@ -269,4 +270,11 @@ export async function handlePromptRoutes(
   // Fallback for unmatched /api/prompts routes
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in prompt routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }

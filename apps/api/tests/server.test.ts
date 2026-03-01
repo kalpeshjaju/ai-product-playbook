@@ -34,6 +34,7 @@ vi.mock('../src/middleware/posthog.js', () => ({
 
 vi.mock('../src/rate-limiter.js', () => ({
   checkTokenBudget: vi.fn().mockResolvedValue({ allowed: true, remaining: 99500, limit: 100000 }),
+  shutdownRedis: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../src/cost-guard.js', () => ({
@@ -62,6 +63,48 @@ vi.mock('../src/routes/composio.js', () => ({
 
 vi.mock('../src/routes/openpipe.js', () => ({
   handleOpenPipeRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/generations.js', () => ({
+  handleGenerationRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/feedback.js', () => ({
+  handleFeedbackRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/documents.js', () => ({
+  handleDocumentRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/embeddings.js', () => ({
+  handleEmbeddingRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/preferences.js', () => ({
+  handlePreferenceRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/transcription.js', () => ({
+  handleTranscriptionRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/routes/few-shot.js', () => ({
+  handleFewShotRoutes: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/db/index.js', () => ({
+  db: {
+    execute: vi.fn().mockResolvedValue([{ '?column?': 1 }]),
+  },
+}));
+
+vi.mock('../src/db/connection.js', () => ({
+  closeDatabase: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('drizzle-orm', () => ({
+  sql: (strings: TemplateStringsArray) => strings.join(''),
 }));
 
 vi.mock('@playbook/shared-llm', () => ({

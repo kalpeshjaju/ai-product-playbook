@@ -35,6 +35,12 @@ model_list:
       model: openrouter/inception/mercury-coder-small-beta
       api_key: "os.environ/OPENROUTER_API_KEY"
 
+  # ─── Embedding (§19 INPUT — pgvector requires consistent model_id) ───
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: "os.environ/OPENAI_API_KEY"
+
   # ─── LlamaGuard (Output Guardrails, §21) ────────────────────
   - model_name: llamaguard
     litellm_params:

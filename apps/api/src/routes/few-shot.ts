@@ -29,6 +29,7 @@ export async function handleFewShotRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   const parsedUrl = new URL(url, 'http://localhost');
 
   // POST /api/few-shot/build
@@ -171,4 +172,11 @@ export async function handleFewShotRoutes(
 
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in few-shot routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }

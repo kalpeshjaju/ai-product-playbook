@@ -63,6 +63,7 @@ export async function handleGenerationRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   const parsedUrl = new URL(url, 'http://localhost');
 
   // GET /api/generations/stats?userId=...&days=7
@@ -149,4 +150,11 @@ export async function handleGenerationRoutes(
 
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in generation routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }

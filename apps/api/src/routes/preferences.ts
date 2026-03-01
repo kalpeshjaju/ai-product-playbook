@@ -33,6 +33,7 @@ export async function handlePreferenceRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   const parsedUrl = new URL(url, 'http://localhost');
 
   // POST /api/preferences/:userId/infer
@@ -231,4 +232,11 @@ export async function handlePreferenceRoutes(
 
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in preference routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }
