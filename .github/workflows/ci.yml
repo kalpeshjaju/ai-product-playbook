@@ -160,7 +160,7 @@ jobs:
         run: PGPASSWORD=test_password_ci psql -h localhost -U playbook_test -d playbook_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
       - name: Apply database schema
-        run: npx drizzle-kit push --config apps/api/drizzle.config.ts
+        run: cd apps/api && npx drizzle-kit push
         env:
           DATABASE_URL: postgresql://playbook_test:test_password_ci@localhost:5432/playbook_test
 

@@ -75,7 +75,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Apply database migrations
-        run: npx drizzle-kit push --config apps/api/drizzle.config.ts
+        run: cd apps/api && npx drizzle-kit push
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
