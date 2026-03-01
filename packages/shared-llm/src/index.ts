@@ -63,6 +63,18 @@ export type {
   ScanConfig,
 } from './guardrails/index.js';
 
+// ─── Document Parsing (§19 INPUT) ───────────────────────────────────────────
+export { parseDocument, isSupportedMimeType } from './parsing/index.js';
+export type { ParsedDocument, SupportedMimeType } from './parsing/index.js';
+
+// ─── Voice Transcription (§19 INPUT) ────────────────────────────────────────
+export { transcribeAudio } from './transcription/index.js';
+export type { TranscriptionResult, TranscribeOptions } from './transcription/index.js';
+
+// ─── Preference Inference (§20 STRATEGY) ────────────────────────────────────
+export { inferPreferences } from './preferences/index.js';
+export type { InferredPreference, FeedbackSignal } from './preferences/index.js';
+
 // ─── Analytics Event Catalog ─────────────────────────────────────────────────
 export { EVENTS } from './analytics/index.js';
 export type { EventName, EventProperties } from './analytics/index.js';

@@ -22,6 +22,11 @@ export const EVENTS = {
   COST_REPORT_VIEWED: 'cost_report_viewed',
   MEMORY_ADDED: 'memory_added',
   MEMORY_SEARCHED: 'memory_searched',
+  PREFERENCE_SET: 'preference_set',
+  PREFERENCE_INFERRED: 'preference_inferred',
+  DOCUMENT_PARSED: 'document_parsed',
+  TRANSCRIPTION_COMPLETED: 'transcription_completed',
+  FEW_SHOT_BUILT: 'few_shot_built',
 } as const;
 
 export type EventName = typeof EVENTS[keyof typeof EVENTS];
@@ -38,4 +43,9 @@ export interface EventProperties {
   [EVENTS.COST_REPORT_VIEWED]: { totalCostUsd?: number };
   [EVENTS.MEMORY_ADDED]: { userId: string };
   [EVENTS.MEMORY_SEARCHED]: { query: string; resultCount: number };
+  [EVENTS.PREFERENCE_SET]: { userId: string; preferenceKey: string; source: string };
+  [EVENTS.PREFERENCE_INFERRED]: { userId: string; count: number };
+  [EVENTS.DOCUMENT_PARSED]: { mimeType: string; success: boolean };
+  [EVENTS.TRANSCRIPTION_COMPLETED]: { durationSeconds: number; confidence: number };
+  [EVENTS.FEW_SHOT_BUILT]: { taskType: string; count: number };
 }

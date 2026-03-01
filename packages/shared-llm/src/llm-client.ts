@@ -12,11 +12,26 @@
  */
 import OpenAI from 'openai';
 
-export function createLLMClient(apiKey?: string): OpenAI {
-  const baseURL = process.env.LITELLM_PROXY_URL || 'http://localhost:4000/v1';
-  const key = apiKey || process.env.LITELLM_API_KEY || '';
+export interface LLMClientOptions {
+  apiKey?: string;
+  /** Extra default headers — used for Langfuse trace forwarding. */
+  headers?: Record<string, string>;
+}
 
-  return new OpenAI({ baseURL, apiKey: key });
+export function createLLMClient(options?: string | LLMClientOptions): OpenAI {
+  // Backwards-compatible: accept raw apiKey string
+  const opts: LLMClientOptions = typeof options === 'string'
+    ? { apiKey: options }
+    : options ?? {};
+
+  const baseURL = process.env.LITELLM_PROXY_URL || 'http://localhost:4000/v1';
+  const key = opts.apiKey || process.env.LITELLM_API_KEY || '';
+
+  return new OpenAI({
+    baseURL,
+    apiKey: key,
+    ...(opts.headers ? { defaultHeaders: opts.headers } : {}),
+  });
 }
 
 export type { OpenAI };

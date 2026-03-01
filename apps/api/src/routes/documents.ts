@@ -11,6 +11,7 @@
  *
  * Routes:
  *   POST /api/documents          — ingest a document (chunk + embed)
+ *   POST /api/documents/upload   — binary upload (PDF/DOCX) via Unstructured.io
  *   GET  /api/documents?limit=20 — list ingested documents
  *   GET  /api/documents/:id      — get single document metadata
  *
@@ -22,7 +23,7 @@ import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { eq, desc } from 'drizzle-orm';
 import { db, documents, embeddings } from '../db/index.js';
-import { createLLMClient } from '@playbook/shared-llm';
+import { createLLMClient, createUserContext, withLangfuseHeaders, parseDocument, isSupportedMimeType } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
@@ -52,9 +53,10 @@ function chunkText(text: string, chunkSize = 2000, overlap = 200): string[] {
 async function generateEmbeddings(
   chunks: string[],
   modelId: string,
+  langfuseHeaders?: Record<string, string>,
 ): Promise<number[][] | null> {
   try {
-    const client = createLLMClient();
+    const client = createLLMClient(langfuseHeaders ? { headers: langfuseHeaders } : undefined);
     const response = await client.embeddings.create({
       model: modelId,
       input: chunks,
@@ -73,6 +75,8 @@ export async function handleDocumentRoutes(
   parseBody: BodyParser,
 ): Promise<void> {
   const parsedUrl = new URL(url, 'http://localhost');
+  const userCtx = createUserContext(req);
+  const langfuseHeaders: Record<string, string> = { ...withLangfuseHeaders(userCtx) };
 
   // GET /api/documents/:id
   const idMatch = parsedUrl.pathname.match(/^\/api\/documents\/([^/]+)$/);
@@ -110,6 +114,97 @@ export async function handleDocumentRoutes(
     return;
   }
 
+  // POST /api/documents/upload — binary document upload (PDF/DOCX)
+  if (parsedUrl.pathname === '/api/documents/upload' && req.method === 'POST') {
+    const contentType = typeof req.headers['content-type'] === 'string'
+      ? req.headers['content-type']
+      : '';
+    const title = typeof req.headers['x-document-title'] === 'string'
+      ? req.headers['x-document-title']
+      : 'Untitled';
+
+    if (!isSupportedMimeType(contentType)) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({
+        error: `Unsupported Content-Type: ${contentType}. Supported: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/plain, text/markdown`,
+      }));
+      return;
+    }
+
+    // Read raw body
+    const rawBody = await new Promise<Buffer>((resolve) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => resolve(Buffer.concat(chunks)));
+      req.on('error', () => resolve(Buffer.alloc(0)));
+    });
+
+    if (rawBody.length === 0) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: 'Empty body' }));
+      return;
+    }
+
+    const parsed = await parseDocument(rawBody, contentType);
+    if (!parsed) {
+      res.statusCode = 502;
+      res.end(JSON.stringify({ error: 'Document parsing failed — Unstructured.io may be unavailable' }));
+      return;
+    }
+
+    const modelId = DEFAULT_EMBEDDING_MODEL;
+    const contentHash = createHash('sha256').update(parsed.text).digest('hex');
+
+    // Dedup
+    const [existing] = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.contentHash, contentHash))
+      .limit(1);
+
+    if (existing) {
+      res.end(JSON.stringify({ duplicate: true, document: existing }));
+      return;
+    }
+
+    const chunks = chunkText(parsed.text);
+    const embeddingVectors = await generateEmbeddings(chunks, modelId, langfuseHeaders);
+    const embeddingSucceeded = embeddingVectors !== null;
+
+    const [doc] = await db
+      .insert(documents)
+      .values({
+        title,
+        mimeType: contentType,
+        contentHash,
+        chunkCount: embeddingSucceeded ? chunks.length : 0,
+        embeddingModelId: embeddingSucceeded ? modelId : null,
+        metadata: parsed.pageCount ? { pageCount: parsed.pageCount } : null,
+      })
+      .returning();
+
+    if (embeddingSucceeded && embeddingVectors && doc) {
+      const embeddingRows = chunks.map((chunk, i) => ({
+        sourceType: 'document' as const,
+        sourceId: doc.id,
+        contentHash: createHash('sha256').update(chunk).digest('hex'),
+        embedding: embeddingVectors[i]!,
+        modelId,
+        metadata: { chunkIndex: i, documentTitle: title },
+      }));
+      await db.insert(embeddings).values(embeddingRows);
+    }
+
+    res.statusCode = 201;
+    res.end(JSON.stringify({
+      document: doc,
+      chunksCreated: embeddingSucceeded ? chunks.length : 0,
+      embeddingsGenerated: embeddingSucceeded,
+      parsedPageCount: parsed.pageCount,
+    }));
+    return;
+  }
+
   // POST /api/documents
   if (parsedUrl.pathname === '/api/documents' && req.method === 'POST') {
     const body = await parseBody(req);
@@ -144,7 +239,7 @@ export async function handleDocumentRoutes(
     const chunks = chunkText(content);
 
     // Generate embeddings (fail-open)
-    const embeddingVectors = await generateEmbeddings(chunks, modelId);
+    const embeddingVectors = await generateEmbeddings(chunks, modelId, langfuseHeaders);
     const embeddingSucceeded = embeddingVectors !== null;
 
     // Insert the document

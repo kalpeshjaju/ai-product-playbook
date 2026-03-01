@@ -84,7 +84,7 @@ for file in $ROUTE_FILES; do
 
     # Try matching with :param replaced by any :word (e.g., :name, :id)
     # Convert /api/prompts/:param/active to a grep pattern matching /api/prompts/:anything/active
-    flex_pattern=$(echo "$readable" | sed 's/:param/:[a-z]*/g')
+    flex_pattern=$(echo "$readable" | sed 's/:param/:[a-zA-Z]*/g')
     if grep -qE "$flex_pattern" "$CONTRACTS_DOC" 2>/dev/null; then
       continue
     fi

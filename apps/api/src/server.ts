@@ -25,6 +25,9 @@ import { handleGenerationRoutes } from './routes/generations.js';
 import { handleFeedbackRoutes } from './routes/feedback.js';
 import { handleDocumentRoutes } from './routes/documents.js';
 import { handleEmbeddingRoutes } from './routes/embeddings.js';
+import { handlePreferenceRoutes } from './routes/preferences.js';
+import { handleTranscriptionRoutes } from './routes/transcription.js';
+import { handleFewShotRoutes } from './routes/few-shot.js';
 import { initPostHogServer, shutdownPostHog } from './middleware/posthog.js';
 
 // Sentry — no-op when DSN not set
@@ -181,6 +184,24 @@ const server = createServer(async (req, res) => {
   // ─── Embedding search (§19) ───
   if (url.startsWith('/api/embeddings')) {
     await handleEmbeddingRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── User preferences (§20 Personalization) ───
+  if (url.startsWith('/api/preferences')) {
+    await handlePreferenceRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Voice transcription (§19 INPUT) ───
+  if (url.startsWith('/api/transcribe')) {
+    await handleTranscriptionRoutes(req, res, url);
+    return;
+  }
+
+  // ─── Few-shot bank (§20 STRATEGY) ───
+  if (url.startsWith('/api/few-shot')) {
+    await handleFewShotRoutes(req, res, url, parseBody);
     return;
   }
 

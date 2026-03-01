@@ -7,10 +7,15 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { trackEvent } from '../../hooks/use-analytics';
 
 export function CostReset() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  useEffect(() => {
+    trackEvent('cost_report_viewed');
+  }, []);
 
   async function handleReset() {
     if (!confirm('Reset all cost tracking data? This cannot be undone.')) return;

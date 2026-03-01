@@ -12,4 +12,5 @@ export {
   documents,
   userPreferences,
   outcomes,
+  fewShotBank,
 } from './schema.js';

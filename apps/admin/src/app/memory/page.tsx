@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { trackEvent } from '../../hooks/use-analytics';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
 
@@ -59,7 +60,9 @@ export default function MemoryPage() {
     try {
       const res = await fetch(`${API_URL}/api/memory/search?q=${encodeURIComponent(searchQuery)}&userId=${userId}`);
       if (res.ok) {
-        setSearchResults(await res.json() as Array<{ entry: MemoryEntry; score: number }>);
+        const results = await res.json() as Array<{ entry: MemoryEntry; score: number }>;
+        setSearchResults(results);
+        trackEvent('memory_searched', { query: searchQuery, resultCount: results.length });
       }
     } catch {
       setStatus('Search failed');
@@ -79,6 +82,7 @@ export default function MemoryPage() {
       if (res.ok) {
         setNewContent('');
         setStatus('Memory added');
+        trackEvent('memory_added', { userId });
         loadMemories();
       } else {
         const json = await res.json() as { error?: string };

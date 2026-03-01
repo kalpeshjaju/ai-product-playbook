@@ -9,6 +9,7 @@
 'use client';
 
 import { useState } from 'react';
+import { trackEvent } from '../../hooks/use-analytics';
 
 interface PromptManagerProps {
   apiUrl: string;
@@ -38,6 +39,7 @@ export function PromptManager({ apiUrl }: PromptManagerProps) {
       const json = await res.json() as Record<string, unknown>;
       if (res.ok) {
         setMessage(`Created ${json.promptName as string} ${json.version as string}`);
+        trackEvent('prompt_created', { promptName: json.promptName as string, version: json.version as string });
         form.reset();
       } else {
         setMessage(`Error: ${json.error as string}`);
@@ -89,6 +91,7 @@ export function PromptManager({ apiUrl }: PromptManagerProps) {
       const json = await res.json() as Record<string, unknown>;
       if (res.ok) {
         setMessage(`Promoted to ${json.newPct as number}%. ${json.nextStep as string}`);
+        trackEvent('prompt_promoted', { promptName: data.get('name') as string, version: data.get('version') as string, newPct: json.newPct as number });
       } else {
         setMessage(`Error: ${json.error as string}`);
       }

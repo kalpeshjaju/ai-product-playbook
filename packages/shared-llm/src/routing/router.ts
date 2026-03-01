@@ -16,6 +16,12 @@
 /** Model tier — maps to model groups in LiteLLM config. */
 export type ModelTier = 'fast' | 'balanced' | 'quality';
 
+/** User preference for routing. */
+export interface RoutingPreference {
+  preferenceKey: string;
+  preferenceValue: unknown;
+}
+
 /** Configuration for routing decisions. */
 export interface RoutingConfig {
   /** Default tier when heuristics are inconclusive */
@@ -28,6 +34,8 @@ export interface RoutingConfig {
   maxLatencyMs?: number;
   /** Budget sensitivity (0–1, higher = prefer cheaper models) */
   costSensitivity?: number;
+  /** User preferences that influence routing (§20 Personalization). */
+  preferences?: RoutingPreference[];
 }
 
 /** The routing decision with model selection rationale. */
@@ -130,6 +138,30 @@ export function routeQuery(query: string, config?: RoutingConfig): RoutingDecisi
       reason: `Forced to ${config.forceTier} tier`,
       active: true,
     };
+  }
+
+  // Apply user preferences (§20 Personalization)
+  if (config?.preferences) {
+    for (const pref of config.preferences) {
+      // preferred_model → map directly to a tier
+      if (pref.preferenceKey === 'preferred_model' && typeof pref.preferenceValue === 'string') {
+        const modelVal = pref.preferenceValue;
+        const tierEntry = Object.entries(TIER_MODELS).find(([, m]) => m === modelVal);
+        if (tierEntry) {
+          return {
+            tier: tierEntry[0] as ModelTier,
+            model: tierEntry[1],
+            complexity: 0,
+            reason: `User preference: preferred_model=${modelVal}`,
+            active: true,
+          };
+        }
+      }
+      // preferred_speed=fast → increase cost sensitivity by 0.3
+      if (pref.preferenceKey === 'preferred_speed' && pref.preferenceValue === 'fast') {
+        config = { ...config, costSensitivity: (config.costSensitivity ?? 0.5) + 0.3 };
+      }
+    }
   }
 
   const complexity = estimateComplexity(query, config?.taskType);

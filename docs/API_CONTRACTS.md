@@ -649,6 +649,183 @@ Direct embedding insertion (for pre-computed embeddings).
 
 ---
 
+### `POST /api/documents/upload`
+
+Binary document upload (PDF, DOCX, TXT, Markdown). Uses Unstructured.io for parsing.
+
+**Headers:**
+- `Content-Type` — MIME type (`application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/plain`, `text/markdown`)
+- `x-document-title` — Document title (optional, defaults to "Untitled")
+
+**Body:** Raw binary content (not JSON).
+
+**Response** `201`:
+```json
+{
+  "document": { "id": "uuid", "title": "...", "chunkCount": 4 },
+  "chunksCreated": 4,
+  "embeddingsGenerated": true,
+  "parsedPageCount": 12
+}
+```
+
+**Response** `400`: `{ "error": "Unsupported Content-Type: ..." }`
+**Response** `502`: `{ "error": "Document parsing failed — Unstructured.io may be unavailable" }`
+
+---
+
+### `POST /api/transcribe`
+
+Transcribe audio via Deepgram. Requires `DEEPGRAM_API_KEY` env var.
+
+**Headers:**
+- `Content-Type` — Audio MIME type (e.g., `audio/wav`, `audio/mp3`). Defaults to `audio/wav`.
+
+**Body:** Raw audio binary.
+
+**Response** `200`:
+```json
+{
+  "text": "The transcribed text...",
+  "confidence": 0.95,
+  "durationSeconds": 12.5
+}
+```
+
+**Response** `400`: `{ "error": "Empty audio body" }`
+**Response** `502`: `{ "error": "Transcription unavailable — DEEPGRAM_API_KEY may not be set" }`
+
+---
+
+### `GET /api/preferences/:userId`
+
+Get all preferences for a user.
+
+**Response** `200`: Array of preference rows.
+
+---
+
+### `POST /api/preferences/:userId`
+
+Set an explicit preference. Upserts if key already exists.
+
+**Request body:**
+```json
+{
+  "preferenceKey": "preferred_model",
+  "preferenceValue": "claude-haiku"
+}
+```
+
+**Response** `201`: Created preference row.
+**Response** `200`: Updated preference row (if key existed).
+
+---
+
+### `PATCH /api/preferences/:userId/:key`
+
+Update a preference value.
+
+**Request body:**
+```json
+{ "preferenceValue": "gpt-4o-mini" }
+```
+
+**Response** `200`: Updated preference row.
+**Response** `404`: `{ "error": "Preference not found: <key>" }`
+
+---
+
+### `DELETE /api/preferences/:userId/:key`
+
+Delete a preference.
+
+**Response** `200`: `{ "deleted": "<key>" }`
+**Response** `404`: `{ "error": "Preference not found: <key>" }`
+
+---
+
+### `POST /api/preferences/:userId/infer`
+
+Trigger preference inference from feedback history. Queries last 100 generations with feedback and applies rule-based pattern matching.
+
+**Response** `200`:
+```json
+{
+  "inferred": 3,
+  "preferences": [
+    { "preferenceKey": "preferred_model", "preferenceValue": "claude-haiku", "confidence": 0.7 }
+  ]
+}
+```
+
+---
+
+### `GET /api/few-shot?taskType=...&limit=5`
+
+Get active few-shot examples for a task type, ordered by quality score.
+
+**Query params:**
+- `taskType` — required
+- `limit` — max 20, default 5
+
+**Response** `200`: Array of few-shot bank rows.
+**Response** `400`: `{ "error": "Required query param: taskType" }`
+
+---
+
+### `POST /api/few-shot`
+
+Manually add a few-shot example.
+
+**Request body:**
+```json
+{
+  "taskType": "classification",
+  "inputText": "Classify this job posting...",
+  "outputText": "Software Engineering",
+  "qualityScore": 0.95,
+  "metadata": {}
+}
+```
+
+**Response** `201`: Created few-shot row.
+
+---
+
+### `POST /api/few-shot/build`
+
+Auto-curate few-shot examples from top-scoring generations (qualityScore >= threshold AND thumbs >= 1).
+
+**Request body:**
+```json
+{
+  "taskType": "classification",
+  "minQualityScore": 0.85,
+  "limit": 20
+}
+```
+
+**Response** `200`:
+```json
+{
+  "taskType": "classification",
+  "candidatesFound": 15,
+  "added": 8
+}
+```
+
+---
+
+### `DELETE /api/few-shot/:id`
+
+Soft-delete a few-shot example (sets `isActive=false`).
+
+**Response** `200`: `{ "deactivated": "<id>" }`
+**Response** `404`: `{ "error": "Few-shot example not found: <id>" }`
+
+---
+
 ## Cost Budget Guard
 
 Cost budget enforcement on `/api/chat*` and `/api/generate*` routes (after rate limiter):

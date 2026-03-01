@@ -200,3 +200,26 @@ export const outcomes = pgTable(
     index('idx_outcomes_user').on(table.userId, table.createdAt),
   ],
 );
+
+// ─── Table 7: few_shot_bank (§20 Layer 3 Few-Shot Learning) ─────────────────
+// Stores high-quality generation examples curated from production data.
+// Used to construct few-shot prompts for improved output quality.
+export const fewShotBank = pgTable(
+  'few_shot_bank',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    taskType: text('task_type').notNull(),
+    inputText: text('input_text').notNull(),
+    outputText: text('output_text').notNull(),
+    qualityScore: numeric('quality_score', { precision: 3, scale: 2 }).notNull(),
+    sourceGenerationId: uuid('source_generation_id').references(() => aiGenerations.id),
+    curatedBy: text('curated_by').notNull().default('auto'), // auto | manual
+    isActive: boolean('is_active').default(true).notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_few_shot_task').on(table.taskType, table.qualityScore),
+    index('idx_few_shot_active').on(table.isActive, table.taskType),
+  ],
+);

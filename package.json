@@ -18,7 +18,9 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "check": "turbo run type-check lint test",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -29,6 +31,10 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.56.1",
     "@playwright/test": "^1.50.0",
+    "@storybook/addon-essentials": "^8.5.0",
+    "@storybook/nextjs": "^8.5.0",
+    "@storybook/react": "^8.5.0",
+    "storybook": "^8.5.0",
     "vitest": "^3.0.0"
   }
 }

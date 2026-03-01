@@ -19,14 +19,14 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { sql } from 'drizzle-orm';
 import { db, embeddings } from '../db/index.js';
-import { createLLMClient } from '@playbook/shared-llm';
+import { createLLMClient, createUserContext, withLangfuseHeaders } from '@playbook/shared-llm';
 
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
 /** Embed a query string using the specified model. */
-async function embedQuery(query: string, modelId: string): Promise<number[] | null> {
+async function embedQuery(query: string, modelId: string, langfuseHeaders?: Record<string, string>): Promise<number[] | null> {
   try {
-    const client = createLLMClient();
+    const client = createLLMClient(langfuseHeaders ? { headers: langfuseHeaders } : undefined);
     const response = await client.embeddings.create({
       model: modelId,
       input: query,
@@ -44,6 +44,8 @@ export async function handleEmbeddingRoutes(
   parseBody: BodyParser,
 ): Promise<void> {
   const parsedUrl = new URL(url, 'http://localhost');
+  const userCtx = createUserContext(req);
+  const langfuseHeaders: Record<string, string> = { ...withLangfuseHeaders(userCtx) };
 
   // GET /api/embeddings/search?q=...&limit=10&modelId=...
   if (parsedUrl.pathname === '/api/embeddings/search' && req.method === 'GET') {
@@ -65,7 +67,7 @@ export async function handleEmbeddingRoutes(
     }
 
     // Embed the query
-    const queryEmbedding = await embedQuery(query, modelId);
+    const queryEmbedding = await embedQuery(query, modelId, langfuseHeaders);
     if (!queryEmbedding) {
       res.statusCode = 502;
       res.end(JSON.stringify({ error: 'Failed to generate query embedding — LiteLLM proxy may be unavailable' }));
