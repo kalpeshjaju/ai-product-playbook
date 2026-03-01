@@ -1,7 +1,7 @@
 /**
  * FILE PURPOSE: API contract tests against real Postgres + Redis
  *
- * WHY: Unit tests mock everything. These 21 tests hit a real API server
+ * WHY: Unit tests mock everything. These 35 tests hit a real API server
  *      backed by Postgres+pgvector and Redis to catch: schema drift,
  *      missing extensions, auth failures, response shape changes.
  *
@@ -64,6 +64,37 @@ async function patch(
   });
   const body = await res.json() as Record<string, unknown>;
   return { status: res.status, body };
+}
+
+/** Helper: JSON DELETE request */
+async function del(path: string): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'DELETE',
+    headers: {
+      'x-api-key': TEST_API_KEY,
+      'x-admin-key': TEST_ADMIN_KEY,
+    },
+  });
+  const body = await res.json() as Record<string, unknown>;
+  return { status: res.status, body };
+}
+
+/** Helper: raw POST request (non-JSON body) */
+async function postRaw(
+  path: string,
+  body: Buffer | Uint8Array,
+  contentType: string,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': contentType,
+      'x-api-key': TEST_API_KEY,
+    },
+    body,
+  });
+  const responseBody = await res.json() as Record<string, unknown>;
+  return { status: res.status, body: responseBody };
 }
 
 // ─── Health & Connectivity ─────────────────────────────────────
@@ -279,5 +310,169 @@ describe('Memory Routes', () => {
     expect(
       Array.isArray(body) || (body as Record<string, unknown>).enabled === false
     ).toBe(true);
+  });
+});
+
+// ─── User Preferences CRUD ─────────────────────────────────────
+
+describe('User Preferences (Postgres)', () => {
+  const testUserId = `e2e-pref-user-${Date.now()}`;
+  const testKey = 'preferred_model';
+
+  it('creates an explicit preference', async () => {
+    const { status, body } = await post(`/api/preferences/${testUserId}`, {
+      preferenceKey: testKey,
+      preferenceValue: 'claude-opus-4-6',
+    });
+    expect(status).toBe(201);
+    expect(body.user_id).toBe(testUserId);
+    expect(body.preference_key).toBe(testKey);
+    expect(body.source).toBe('explicit');
+    expect(body.confidence).toBe('1.00');
+  });
+
+  it('retrieves preferences for user', async () => {
+    const { status, body } = await get(`/api/preferences/${testUserId}`);
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    const prefs = body as unknown as Array<Record<string, unknown>>;
+    expect(prefs.length).toBeGreaterThanOrEqual(1);
+    expect(prefs[0]?.preference_key).toBe(testKey);
+  });
+
+  it('updates a preference value', async () => {
+    const { status, body } = await patch(`/api/preferences/${testUserId}/${testKey}`, {
+      preferenceValue: 'claude-sonnet-4-6',
+    });
+    expect(status).toBe(200);
+    expect(body.preference_value).toBe('claude-sonnet-4-6');
+  });
+
+  it('rejects update without preferenceValue', async () => {
+    const { status, body } = await patch(`/api/preferences/${testUserId}/${testKey}`, {});
+    expect(status).toBe(400);
+    expect(body.error).toBeTypeOf('string');
+  });
+
+  it('deletes a preference', async () => {
+    const { status, body } = await del(`/api/preferences/${testUserId}/${testKey}`);
+    expect(status).toBe(200);
+    expect(body.deleted).toBe(testKey);
+  });
+
+  it('returns 404 deleting non-existent preference', async () => {
+    const { status } = await del(`/api/preferences/${testUserId}/nonexistent-key`);
+    expect(status).toBe(404);
+  });
+});
+
+// ─── Few-Shot Bank CRUD ────────────────────────────────────────
+
+describe('Few-Shot Bank (Postgres)', () => {
+  const taskType = `e2e-task-${Date.now()}`;
+  let createdId: string;
+
+  it('manually adds a few-shot example', async () => {
+    const { status, body } = await post('/api/few-shot', {
+      taskType,
+      inputText: 'What is the capital of France?',
+      outputText: 'Paris is the capital of France.',
+      qualityScore: 0.95,
+    });
+    expect(status).toBe(201);
+    expect(body.task_type).toBe(taskType);
+    expect(body.curated_by).toBe('manual');
+    expect(body.is_active).toBe(true);
+    expect(body.id).toBeTypeOf('string');
+    createdId = body.id as string;
+  });
+
+  it('retrieves examples by taskType', async () => {
+    const { status, body } = await get(`/api/few-shot?taskType=${taskType}`);
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    const examples = body as unknown as Array<Record<string, unknown>>;
+    expect(examples.length).toBeGreaterThanOrEqual(1);
+    expect(examples[0]?.task_type).toBe(taskType);
+  });
+
+  it('rejects GET without taskType', async () => {
+    const { status, body } = await get('/api/few-shot');
+    expect(status).toBe(400);
+    expect(body.error).toContain('taskType');
+  });
+
+  it('rejects POST with missing fields', async () => {
+    const { status, body } = await post('/api/few-shot', {
+      taskType,
+      // missing inputText and outputText
+    });
+    expect(status).toBe(400);
+    expect(body.error).toBeTypeOf('string');
+  });
+
+  it('soft-deletes a few-shot example', async () => {
+    const { status, body } = await del(`/api/few-shot/${createdId}`);
+    expect(status).toBe(200);
+    expect(body.deactivated).toBe(createdId);
+  });
+});
+
+// ─── Embedding Routes (validation) ────────────────────────────
+
+describe('Embedding Routes (validation)', () => {
+  it('rejects search without q param', async () => {
+    const { status, body } = await get('/api/embeddings/search?modelId=text-embedding-3-small');
+    expect(status).toBe(400);
+    expect(body.error).toContain('q');
+  });
+
+  it('rejects search without modelId (§19 HARD GATE)', async () => {
+    const { status, body } = await get('/api/embeddings/search?q=test+query');
+    expect(status).toBe(400);
+    expect(body.error).toContain('modelId');
+  });
+
+  it('rejects POST with missing fields', async () => {
+    const { status, body } = await post('/api/embeddings', {
+      sourceType: 'document',
+      // missing sourceId, contentHash, embedding, modelId
+    });
+    expect(status).toBe(400);
+    expect(body.error).toContain('Required');
+  });
+});
+
+// ─── Composio Routes (fail-open) ──────────────────────────────
+
+describe('Composio Routes (fail-open)', () => {
+  it('returns disabled message when COMPOSIO_API_KEY not set', async () => {
+    const { status, body } = await get('/api/composio/actions');
+    // Without API key, should fail-open with enabled: false
+    expect(status).toBe(200);
+    expect(body.enabled).toBe(false);
+    expect(body.message).toContain('COMPOSIO_API_KEY');
+  });
+});
+
+// ─── OpenPipe Routes (fail-open) ──────────────────────────────
+
+describe('OpenPipe Routes (fail-open)', () => {
+  it('returns disabled message when OPENPIPE_API_KEY not set', async () => {
+    const { status, body } = await get('/api/openpipe/finetune/test-job');
+    // Without API key, should fail-open with enabled: false
+    expect(status).toBe(200);
+    expect(body.enabled).toBe(false);
+    expect(body.message).toContain('OPENPIPE_API_KEY');
+  });
+});
+
+// ─── Transcription Routes (validation) ────────────────────────
+
+describe('Transcription Routes (validation)', () => {
+  it('rejects empty audio body', async () => {
+    const { status, body } = await postRaw('/api/transcribe', Buffer.alloc(0), 'audio/wav');
+    expect(status).toBe(400);
+    expect(body.error).toContain('Empty audio body');
   });
 });

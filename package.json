@@ -19,7 +19,9 @@
     "test": "turbo run test",
     "check": "turbo run type-check lint test",
     "test:e2e": "playwright test",
+    "test:e2e:fullstack": "playwright test --config=playwright.e2e.config.ts",
     "test:contract": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:infra": "bash scripts/test-e2e-infra.sh",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
