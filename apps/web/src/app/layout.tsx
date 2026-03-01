@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased bg-gray-50 text-gray-900">
         <PostHogProvider>
           {clerkEnabled ? (
-            <ClerkProviderShell>
+            <ClerkProviderShell publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}>
               <AppShell>{children}</AppShell>
             </ClerkProviderShell>
           ) : (

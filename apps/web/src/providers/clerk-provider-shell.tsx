@@ -11,6 +11,12 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 
-export function ClerkProviderShell({ children }: { children: React.ReactNode }) {
-  return <ClerkProvider>{children}</ClerkProvider>;
+export function ClerkProviderShell({
+  children,
+  publishableKey,
+}: {
+  children: React.ReactNode;
+  publishableKey: string;
+}) {
+  return <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider>;
 }

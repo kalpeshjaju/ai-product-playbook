@@ -94,7 +94,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="font-sans antialiased bg-gray-50 text-gray-900">
         <PostHogProvider>
-          <ClerkProviderShell>
+          <ClerkProviderShell publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}>
             {userId ? adminContent : <AuthGate>{adminContent}</AuthGate>}
           </ClerkProviderShell>
         </PostHogProvider>
