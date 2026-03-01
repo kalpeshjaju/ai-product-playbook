@@ -11,6 +11,10 @@
  *      4. Insert document row
  *      5. Insert embedding rows
  *
+ * Rate limiting: callers must call checkTokenBudget() before invoking persistDocument().
+ *   - /api/documents: checks in route handler (documents.ts)
+ *   - /api/ingest: checks in server.ts (line ~209, covers /api/ingest prefix)
+ *
  * AUTHOR: Claude Opus 4.6
  * LAST UPDATED: 2026-03-01
  */
