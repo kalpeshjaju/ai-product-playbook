@@ -2,8 +2,9 @@
 # See: https://github.com/BerriAI/litellm/releases
 FROM ghcr.io/berriai/litellm:v1.81.12-stable.1
 
-COPY config.yaml /app/config.yaml
-COPY start.sh /app/start.sh
+# Railway build context is repo root (RAILWAY_DOCKERFILE_PATH=services/litellm/Dockerfile)
+COPY services/litellm/config.yaml /app/config.yaml
+COPY services/litellm/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 # Run as non-root (Semgrep: missing-user-entrypoint)
