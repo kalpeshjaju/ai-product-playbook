@@ -9,33 +9,39 @@ import type { Job } from 'bullmq';
 import type { IngestionJobData } from './jobs.js';
 import { JobType } from './queue.js';
 import { parseRedisConnection } from './connection.js';
+import { processEmbed } from './processors/embed.js';
+import { processEnrich } from './processors/enrich.js';
+import { processDedupCheck } from './processors/dedup-check.js';
+import { processReEmbed } from './processors/re-embed.js';
+import { processFreshness } from './processors/freshness.js';
+import { processScrape } from './processors/scrape.js';
 
 type JobProcessor = (job: Job<IngestionJobData>) => Promise<void>;
 
 const processors: Record<string, JobProcessor> = {
   [JobType.EMBED]: async (job) => {
-    // TODO: Generate embeddings for document chunks
-    process.stderr.write(`INFO: Processing embed job for ${job.data.documentId}\n`);
+    const result = await processEmbed(job);
+    await job.log(`Embedded ${result.vectors.length} chunks with model ${result.modelId}`);
   },
   [JobType.ENRICH]: async (job) => {
-    // TODO: Run enrichment graph (entity extraction, linking)
-    process.stderr.write(`INFO: Processing enrich job for ${job.data.documentId}\n`);
+    const result = await processEnrich(job);
+    await job.log(`Enriched: ${result.entities.length} entities, ${result.topics.length} topics`);
   },
   [JobType.DEDUP_CHECK]: async (job) => {
-    // TODO: Near-dedup + entity-dedup
-    process.stderr.write(`INFO: Processing dedup-check job for ${job.data.documentId}\n`);
+    const result = await processDedupCheck(job);
+    await job.log(`Dedup: isDuplicate=${result.isDuplicate}, nearDuplicate=${result.nearDuplicate}`);
   },
   [JobType.RE_EMBED]: async (job) => {
-    // TODO: Re-generate embeddings with new model
-    process.stderr.write(`INFO: Processing re-embed job for ${job.data.documentId}\n`);
+    const result = await processReEmbed(job, { chunks: [] });
+    await job.log(`Re-embedded ${result.vectors.length} chunks: ${result.oldModelId} → ${result.newModelId}`);
   },
   [JobType.FRESHNESS]: async (job) => {
-    // TODO: Check valid_until, demote stale docs
-    process.stderr.write(`INFO: Processing freshness job for ${job.data.documentId}\n`);
+    const result = await processFreshness(job, { ingestedAt: null, validUntil: null });
+    await job.log(`Freshness: ${result.status} (multiplier: ${result.freshnessMultiplier})`);
   },
   [JobType.SCRAPE]: async (job) => {
-    // TODO: Firecrawl scrape + ingest
-    process.stderr.write(`INFO: Processing scrape job for ${job.data.documentId}\n`);
+    const result = await processScrape(job);
+    await job.log(`Scrape: ${result ? `${result.text.length} chars` : 'null (failed)'}`);
   },
 };
 

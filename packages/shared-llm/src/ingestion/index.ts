@@ -26,3 +26,22 @@ export type {
 export { createIngestionWorker } from './pipeline/workers.js';
 export { parseRedisConnection } from './pipeline/connection.js';
 export type { RedisConnectionOptions } from './pipeline/connection.js';
+export {
+  processEmbed,
+  processEnrich,
+  processDedupCheck,
+  processReEmbed,
+  processFreshness,
+  processScrape,
+} from './pipeline/processors/index.js';
+export type {
+  EmbedResult,
+  EnrichResult,
+  EnrichEntity,
+  DedupCheckResult,
+  DedupCheckOptions,
+  ReEmbedResult,
+  ReEmbedOptions,
+  FreshnessResult,
+  FreshnessDocInfo,
+} from './pipeline/processors/index.js';
