@@ -57,9 +57,4 @@ reviews:
 chat:
   auto_reply: true
 tone_instructions: >
-  Direct and technical. This is a multi-LLM codebase (Claude, Codex, Cursor, Gemini).
-  Flag hallucination risks: phantom imports, fabricated APIs, stub functions, empty catches.
-  Flag anti-patterns from the Learning Journal (docs/LEARNING_JOURNAL.md).
-  Every claimed behavior must have evidence (test output, curl, screenshot).
-  If you see a pattern that has been flagged 3+ times in feedback, recommend escalation
-  to an automated check (ESLint rule, CI script, or git hook).
+  Direct, technical. Multi-LLM codebase. Flag hallucinated imports, fabricated APIs, stub returns, empty catches. Require evidence for claimed behavior. Recommend CI escalation for 3x repeat patterns.
