@@ -28,6 +28,10 @@
   - Evidence: `scripts/check-context-injection.sh`, `scripts/check-user-identity.sh`, `scripts/check-ai-logging.sh`, `.github/workflows/ci.yml`
 - [x] **Weekly flywheel automation workflow now exists** (few-shot refresh, preference inference, moat snapshot report).
   - Evidence: `scripts/run-strategy-flywheel.ts`, `.github/workflows/strategy-flywheel.yml`
+- [x] **Bulk preference inference endpoint exists for automated loops** (`POST /api/preferences/infer-all`).
+  - Evidence: `apps/api/src/routes/preferences.ts`
+- [x] **Flywheel workflow now has config/secret preflight with infer-all fallback**.
+  - Evidence: `.github/workflows/strategy-flywheel.yml`, `scripts/run-strategy-flywheel.ts`
 
 ## 3. P0 pending (must close for real-world production readiness)
 
@@ -37,15 +41,14 @@
 - [ ] **Decide fail-open vs fail-closed policy for strategy-critical providers** (Composio, OpenPipe, memory).
   - Gap: several integrations intentionally no-op when keys are missing.
   - Close by: enforce strict mode in production or add explicit degradation SLO + alerting.
-- [ ] **Operationalize flywheel scope inputs** (`FLYWHEEL_TASK_TYPES`, `FLYWHEEL_USER_IDS`).
-  - Gap: workflow exists but depends on repo variables for task/user scope.
-  - Close by: configure vars + documented owner runbook.
+- [ ] **Finalize flywheel scope governance** (`FLYWHEEL_TASK_TYPES`, optional `FLYWHEEL_USER_IDS`).
+  - Gap: workflow now supports infer-all fallback, but owner-level defaults/runbook still need explicit org sign-off.
+  - Close by: configure repo vars + add owner runbook entry.
 - [ ] **Add integration test for flywheel runner against live/staging API**.
   - Gap: current validation is local dry-run.
   - Close by: CI/manual job that asserts successful non-dry-run execution and zero failures.
-- [ ] **Add guardrail around API credentials required by scheduled workflow**.
-  - Gap: workflow depends on `API_URL/API_KEY/ADMIN_API_KEY`; missing secret causes runtime failure only.
-  - Close by: preflight step that fails fast with explicit secret checklist output.
+- [x] **Add guardrail around API credentials required by scheduled workflow**.
+  - Closed by: preflight step in `strategy-flywheel.yml` that hard-fails on missing `API_URL/API_KEY/ADMIN_API_KEY`.
 
 ## 4. P1 pending (moat depth + compounding quality)
 

@@ -755,9 +755,45 @@ Trigger preference inference from feedback history. Queries last 100 generations
 **Response** `200`:
 ```json
 {
+  "userId": "user-123",
+  "feedbackRows": 42,
   "inferred": 3,
-  "preferences": [
-    { "preferenceKey": "preferred_model", "preferenceValue": "claude-haiku", "confidence": 0.7 }
+  "skippedExplicit": 1
+}
+```
+
+---
+
+### `POST /api/preferences/infer-all`
+
+Admin bulk inference for preference learning. Selects users from `ai_generations` with feedback and runs the same inference pipeline as `/api/preferences/:userId/infer`.
+
+**Request body (optional):**
+```json
+{
+  "limitUsers": 100,
+  "minFeedbackCount": 3
+}
+```
+
+**Response** `200`:
+```json
+{
+  "processedUsers": 8,
+  "selectedUsers": 8,
+  "scannedUsers": 12,
+  "minFeedbackCount": 3,
+  "limitUsers": 100,
+  "totalFeedbackRows": 520,
+  "totalInferred": 28,
+  "totalSkippedExplicit": 4,
+  "summaries": [
+    {
+      "userId": "user-123",
+      "feedbackRows": 63,
+      "inferred": 4,
+      "skippedExplicit": 1
+    }
   ]
 }
 ```

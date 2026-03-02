@@ -52,6 +52,7 @@ const ROUTE_RULES: RouteRule[] = [
   { prefix: '/api/documents/upload', methods: ['POST'], tier: 'admin' },
   { prefix: '/api/documents', methods: ['POST'], tier: 'admin' },
   { prefix: '/api/few-shot/build', methods: ['POST'], tier: 'admin' },
+  { prefix: '/api/preferences/infer-all', methods: ['POST'], tier: 'admin' },
   { prefix: '/api/few-shot', methods: ['POST'], tier: 'admin' },
   { prefix: '/api/few-shot', methods: ['DELETE'], tier: 'admin' },
   { prefix: '/api/prompts', methods: ['POST'], tier: 'admin' },

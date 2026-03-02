@@ -124,6 +124,10 @@ describe('getRequiredTier', () => {
     expect(getRequiredTier('/api/preferences/user1', 'GET')).toBe('user');
   });
 
+  it('returns admin for POST /api/preferences/infer-all', () => {
+    expect(getRequiredTier('/api/preferences/infer-all', 'POST')).toBe('admin');
+  });
+
   it('returns user for GET /api/generations', () => {
     expect(getRequiredTier('/api/generations?userId=user1', 'GET')).toBe('user');
   });

@@ -381,4 +381,95 @@ describe('handlePreferenceRoutes', () => {
     expect(body.inferred).toBe(1);
     expect(mockInferPreferences).toHaveBeenCalledOnce();
   });
+
+  // POST /api/preferences/infer-all
+  it('POST /api/preferences/infer-all processes qualifying users', async () => {
+    const generationRows = [
+      {
+        userFeedback: 'accepted',
+        thumbs: 1,
+        model: 'gpt-4',
+        taskType: 'summarize',
+        latencyMs: 900,
+        qualityScore: '0.88',
+        userEditDiff: null,
+      },
+    ];
+
+    let selectCallCount = 0;
+    mockSelect.mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) {
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          groupBy: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue([
+            { userId: 'user-1', feedbackCount: 5 },
+            { userId: 'user-2', feedbackCount: 2 },
+          ]),
+        };
+      }
+      if (selectCallCount === 2) {
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue(generationRows),
+        };
+      }
+      return {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+      };
+    });
+
+    mockInferPreferences.mockReturnValue([
+      { preferenceKey: 'preferred_model', preferenceValue: 'gpt-4', confidence: 0.81 },
+    ]);
+
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handlePreferenceRoutes(req, res, '/api/preferences/infer-all', createBodyParser({}));
+
+    expect(res._statusCode).toBe(200);
+    const body = JSON.parse(res._body) as Record<string, unknown>;
+    expect(body.processedUsers).toBe(1);
+    expect(body.selectedUsers).toBe(1);
+    expect(body.scannedUsers).toBe(2);
+    expect(mockInferPreferences).toHaveBeenCalledOnce();
+  });
+
+  it('POST /api/preferences/infer-all returns zero when no users meet threshold', async () => {
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      groupBy: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([
+        { userId: 'user-1', feedbackCount: 1 },
+      ]),
+    });
+
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handlePreferenceRoutes(
+      req,
+      res,
+      '/api/preferences/infer-all',
+      createBodyParser({ minFeedbackCount: 5 }),
+    );
+
+    expect(res._statusCode).toBe(200);
+    const body = JSON.parse(res._body) as Record<string, unknown>;
+    expect(body.processedUsers).toBe(0);
+    expect(body.selectedUsers).toBe(0);
+    expect(mockInferPreferences).not.toHaveBeenCalled();
+  });
 });

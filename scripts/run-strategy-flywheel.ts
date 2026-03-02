@@ -96,6 +96,8 @@ async function run(): Promise<void> {
   const userIds = parseCsvEnv(process.env.FLYWHEEL_USER_IDS);
   const minQualityScore = envNumber('FLYWHEEL_MIN_QUALITY_SCORE', 0.85);
   const buildLimit = envNumber('FLYWHEEL_BUILD_LIMIT', 20);
+  const inferAllLimit = envNumber('FLYWHEEL_INFER_ALL_LIMIT', 100);
+  const inferMinFeedbackCount = envNumber('FLYWHEEL_INFER_MIN_FEEDBACK_COUNT', 3);
 
   const reportPath = resolve(process.env.FLYWHEEL_REPORT_PATH?.trim() || 'strategy-flywheel-report.json');
 
@@ -164,29 +166,63 @@ async function run(): Promise<void> {
   }
 
   const preferenceInference: OperationResult[] = [];
-  for (const userId of userIds) {
+  if (userIds.length === 0) {
     if (dryRun) {
       preferenceInference.push({
-        name: `preferences-infer:${userId}`,
+        name: 'preferences-infer-all',
         ok: true,
         statusCode: 0,
-        details: { skipped: true },
+        details: {
+          skipped: true,
+          payload: {
+            limitUsers: inferAllLimit,
+            minFeedbackCount: inferMinFeedbackCount,
+          },
+        },
       });
-      continue;
+    } else {
+      const result = await requestJson({
+        url: `${apiUrl}/api/preferences/infer-all`,
+        method: 'POST',
+        headers,
+        body: {
+          limitUsers: inferAllLimit,
+          minFeedbackCount: inferMinFeedbackCount,
+        },
+      });
+
+      preferenceInference.push({
+        name: 'preferences-infer-all',
+        ok: result.ok,
+        statusCode: result.statusCode,
+        details: result.body,
+      });
     }
+  } else {
+    for (const userId of userIds) {
+      if (dryRun) {
+        preferenceInference.push({
+          name: `preferences-infer:${userId}`,
+          ok: true,
+          statusCode: 0,
+          details: { skipped: true },
+        });
+        continue;
+      }
 
-    const result = await requestJson({
-      url: `${apiUrl}/api/preferences/${encodeURIComponent(userId)}/infer`,
-      method: 'POST',
-      headers,
-    });
+      const result = await requestJson({
+        url: `${apiUrl}/api/preferences/${encodeURIComponent(userId)}/infer`,
+        method: 'POST',
+        headers,
+      });
 
-    preferenceInference.push({
-      name: `preferences-infer:${userId}`,
-      ok: result.ok,
-      statusCode: result.statusCode,
-      details: result.body,
-    });
+      preferenceInference.push({
+        name: `preferences-infer:${userId}`,
+        ok: result.ok,
+        statusCode: result.statusCode,
+        details: result.body,
+      });
+    }
   }
 
   const failures = [
