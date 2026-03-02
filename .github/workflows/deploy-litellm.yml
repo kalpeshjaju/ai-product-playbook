@@ -1,11 +1,12 @@
 ##
-# FILE PURPOSE: Deploy LiteLLM proxy to Railway on push to main
+# FILE PURPOSE: Post-deploy smoke test for LiteLLM on Railway
 #
-# WHY: Path-filtered deploys — only deploys when LiteLLM config changes.
-# HOW: Railway CLI deploy using the Dockerfile in services/litellm/.
+# WHY: Railway auto-deploys from git push to main (git-based deploy).
+#      This workflow verifies LiteLLM is healthy after auto-deploy.
+# HOW: On push to main (litellm path), waits for Railway build, then checks /v1/models.
 #
 # AUTHOR: Claude Opus 4.6
-# LAST UPDATED: 2026-03-01
+# LAST UPDATED: 2026-03-02
 ##
 
 name: Deploy LiteLLM
@@ -22,16 +23,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  post-deploy-check:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - name: Wait for Railway auto-deploy
+        run: |
+          echo "Railway auto-deploys from git push to main."
+          echo "Waiting 120s for build + deploy to complete..."
+          sleep 120
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+      - name: Health check — /v1/models
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /tmp/models.json -w '%{http_code}' \
+              "${{ secrets.LITELLM_PROXY_URL }}/v1/models" \
+              --max-time 10) || true
 
-      - name: Deploy to Railway
-        run: railway up --service litellm
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+            if [ "$STATUS" = "200" ]; then
+              MODEL_COUNT=$(python3 -c "import json; print(len(json.load(open('/tmp/models.json')).get('data',[])))" 2>/dev/null || echo "0")
+              echo "LiteLLM is healthy (attempt $i) — $MODEL_COUNT models loaded"
+              if [ "$MODEL_COUNT" -gt "0" ]; then
+                exit 0
+              fi
+              echo "Warning: 0 models loaded, retrying..."
+            else
+              echo "Attempt $i: got HTTP $STATUS, retrying in 15s..."
+            fi
+
+            sleep 15
+          done
+
+          echo "LiteLLM health check failed after 5 attempts"
+          exit 1

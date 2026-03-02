@@ -40,8 +40,11 @@
 
 ## Deployment Checklist
 
+- **[HARD GATE] GIT-BASED DEPLOY ONLY.** Never use `railway up`. All Railway services deploy via git push to `main` (GitHub repo connected in Railway dashboard). All Vercel apps deploy via git push to `main` (GitHub repo connected in Vercel dashboard).
 - Before deploying, verify all dependencies are in `package.json` / `requirements.txt`. Run a clean install (`npm ci` / `pip install -r requirements.txt`) to catch missing deps before they cause silent production failures.
 - Always ensure env vars match across Railway and Vercel — especially API keys. Check actual deployed values, not just `.env` files.
+- **Railway root directories**: playbook-api → `/` (Dockerfile.api), ingestion-worker → `/` (Dockerfile.worker), litellm → `services/litellm/`, crawl4ai → `services/crawl4ai/`, dspy-optimizer → `services/dspy/`.
+- **Vercel root directories**: web → `apps/web`, admin → `apps/admin`.
 
 ## Scripting Conventions
 
