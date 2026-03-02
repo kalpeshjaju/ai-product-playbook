@@ -12,6 +12,8 @@ reviews:
         No print() in production. Use logging. No bare except. Files < 600 lines.
         Flag stub returns (return [], return {}, return None) without TODO marker.
         Flag empty catch/except blocks that swallow errors.
+        Flag pinned dependencies (== in requirements.txt) where the version does not exist
+        on PyPI. Verify version strings look realistic (not hallucinated by LLM).
     - path: "**/*.ts"
       instructions: >
         No any types (use unknown). No console.log. No commented-out code.
@@ -19,6 +21,8 @@ reviews:
         Flag empty catch blocks that swallow errors.
         Flag .where().where() chaining in Drizzle (must use and()).
         Flag import Redis from 'ioredis' (must use { Redis }).
+        Flag copy-paste drift: near-identical code blocks (3+ lines) with subtle differences
+        (e.g. one updated, others not). Suggest extracting a shared helper or fixing the inconsistency.
     - path: "**/*.tsx"
       instructions: >
         No any types (use unknown). No console.log. No commented-out code.
@@ -41,6 +45,11 @@ reviews:
         Flag JSON.parse() on raw LLM output (use multi-strategy extractor).
         Flag || with LLM response fields (use ?? nullish coalescing).
         Verify timeout hierarchy: agent < executor < HTTP.
+    - path: "**/requirements*.txt"
+      instructions: >
+        All Python dependencies must use exact pinning (==, not >= or ~=).
+        Flag any version that looks fabricated — check that major.minor.patch
+        is a plausible release (e.g. 0.18.5 for a package whose 0.18.x ends at 0.18.3).
     - path: ".github/workflows/**"
       instructions: >
         Verify AUTH_MODE=strict in CI (never AUTH_MODE=open).

@@ -15,6 +15,7 @@ import storybook from "eslint-plugin-storybook";
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import nextPlugin from '@next/eslint-plugin-next';
+import vitest from '@vitest/eslint-plugin';
 
 export default tseslint.config(eslint.configs.recommended, ...tseslint.configs.recommended, {
   files: ['packages/**/src/**/*.{ts,tsx}', 'apps/**/src/**/*.{ts,tsx}'],
@@ -39,6 +40,12 @@ export default tseslint.config(eslint.configs.recommended, ...tseslint.configs.r
   rules: {
     ...nextPlugin.configs.recommended.rules,
     ...nextPlugin.configs['core-web-vitals'].rules,
+  },
+}, {
+  files: ['**/tests/**/*.test.{ts,tsx}'],
+  plugins: { vitest },
+  rules: {
+    'vitest/expect-expect': 'error',
   },
 }, {
   ignores: ['dist/', 'node_modules/', '*.config.js', '*.config.ts'],
