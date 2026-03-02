@@ -23,21 +23,8 @@ import { createUserContext } from '@playbook/shared-llm';
 import { db } from '../db/index.js';
 import { promptVersions } from '../db/schema.js';
 import { resolvePromptWithAB } from '../middleware/prompt-ab.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
-
-/** Weighted random selection from active prompt versions. */
-function weightedRandom<T extends { activePct: number }>(items: T[]): T | undefined {
-  const total = items.reduce((acc, item) => acc + item.activePct, 0);
-  if (total === 0) return items[0];
-
-  let random = Math.random() * total;
-  for (const item of items) {
-    random -= item.activePct;
-    if (random <= 0) return item;
-  }
-  return items[items.length - 1];
-}
+import { handleRouteError, type BodyParser } from '../types.js';
+import { weightedRandom } from '../utils/weighted-random.js';
 
 /** Derive next semver minor: v1.0.0 → v1.1.0 */
 function nextMinorVersion(latest: string | undefined): string {
@@ -287,10 +274,6 @@ export async function handlePromptRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in prompt routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'prompt', err);
   }
 }

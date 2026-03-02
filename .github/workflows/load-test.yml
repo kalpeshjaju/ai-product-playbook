@@ -66,8 +66,7 @@ jobs:
 
       - uses: grafana/setup-k6-action@v1
 
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+      - uses: ./.github/actions/disable-needrestart
 
       - run: npm ci --legacy-peer-deps
 

@@ -16,7 +16,7 @@
  * LAST UPDATED: 2026-03-02
  */
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMemoryProvider, scanOutput } from '@playbook/shared-llm';
 import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
 import { handleRouteError, type BodyParser } from '../types.js';

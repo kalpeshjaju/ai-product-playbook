@@ -20,8 +20,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { eq, and, desc, gte, isNotNull } from 'drizzle-orm';
 import { db, fewShotBank, aiGenerations } from '../db/index.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 export async function handleFewShotRoutes(
   req: IncomingMessage,
@@ -173,10 +172,6 @@ export async function handleFewShotRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in few-shot routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'few-shot', err);
   }
 }

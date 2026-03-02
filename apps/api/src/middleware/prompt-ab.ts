@@ -14,6 +14,7 @@ import { and, eq, gt } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { promptVersions } from '../db/schema.js';
 import { getFeatureFlag, captureServerEvent } from './posthog.js';
+import { weightedRandom } from '../utils/weighted-random.js';
 
 /** Shape of a row from prompt_versions query. */
 interface PromptVersionRow {
@@ -37,22 +38,6 @@ export interface PromptResolution {
   variant: string;
   /** How this prompt was selected */
   source: 'posthog-flag' | 'weighted-random' | 'single-active';
-}
-
-/**
- * Weighted random selection from active prompt versions.
- * Matches the logic in routes/prompts.ts.
- */
-function weightedRandom<T extends { activePct: number }>(items: T[]): T | undefined {
-  const total = items.reduce((acc, item) => acc + item.activePct, 0);
-  if (total === 0) return items[0];
-
-  let random = Math.random() * total;
-  for (const item of items) {
-    random -= item.activePct;
-    if (random <= 0) return item;
-  }
-  return items[items.length - 1];
 }
 
 /**

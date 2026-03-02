@@ -20,8 +20,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { eq } from 'drizzle-orm';
 import { db, aiGenerations, outcomes } from '../db/index.js';
 import type { AuthResult } from '../middleware/auth.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 const VALID_FEEDBACK = ['accepted', 'rejected', 'edited', 'regenerated', 'ignored'] as const;
 const VALID_THUMBS = [-1, 0, 1] as const;
@@ -172,10 +171,6 @@ export async function handleFeedbackRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in feedback routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'feedback', err);
   }
 }

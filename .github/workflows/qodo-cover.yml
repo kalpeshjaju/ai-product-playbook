@@ -39,8 +39,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+      - uses: ./.github/actions/disable-needrestart
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps

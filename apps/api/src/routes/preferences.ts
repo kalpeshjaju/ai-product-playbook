@@ -25,8 +25,7 @@ import { eq, and, isNotNull, desc, sql } from 'drizzle-orm';
 import { db, userPreferences, aiGenerations } from '../db/index.js';
 import { inferPreferences } from '@playbook/shared-llm';
 import type { FeedbackSignal } from '@playbook/shared-llm';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 interface InferenceSummary {
   userId: string;
@@ -312,10 +311,6 @@ export async function handlePreferenceRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in preference routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'preference', err);
   }
 }

@@ -11,6 +11,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Queue } from 'bullmq';
 import type { IngestionJobData } from '@playbook/shared-llm';
+import { handleRouteError } from '../types.js';
 import {
   IngesterRegistry,
   DocumentIngester,
@@ -164,10 +165,6 @@ export async function handleIngestRoutes(
     res.statusCode = 404;
     res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in ingest routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'ingest', err);
   }
 }

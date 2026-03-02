@@ -36,8 +36,7 @@ import {
   persistDocument,
   estimateTokens,
 } from '../services/document-persistence.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 export async function handleDocumentRoutes(
   req: IncomingMessage,
@@ -243,10 +242,6 @@ export async function handleDocumentRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in document routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'document', err);
   }
 }

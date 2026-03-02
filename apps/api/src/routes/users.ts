@@ -17,6 +17,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AdminUser } from '@playbook/shared-types';
+import { handleRouteError } from '../types.js';
 
 export async function handleUserRoutes(
   req: IncomingMessage,
@@ -54,10 +55,6 @@ export async function handleUserRoutes(
     res.statusCode = 404;
     res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in user routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'user', err);
   }
 }
