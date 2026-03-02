@@ -5,6 +5,18 @@
 
 ---
 
+## 0. Current implementation snapshot (2026-03-02)
+
+This file is the strategy stack reference. For a concrete readiness ledger (done vs pending vs production-ready), see:
+
+- `docs/STRATEGY-READINESS-TODOS.md`
+
+Status interpretation:
+- **Implemented in repo**: code/workflow exists.
+- **Pending production validation**: live credentials/integration/traffic evidence still required.
+
+---
+
 ## 1. Tool roster (buy) — organized by priority tier
 
 ### Tier 1: P0 — Add Now (required for production)
@@ -65,30 +77,30 @@ Use this to get the stack "ready" without missing a piece.
 
 ### Tier 1 (P0 — do these first)
 
-- [ ] **Promptfoo**: Install (CLI/npm), add eval config, run first eval; optionally wire into CI.
-- [ ] **LiteLLM**: Deploy proxy (e.g. Docker/Helm), configure providers, set routing rules; point app at proxy URL.
-- [ ] **Langfuse**: Deploy (cloud or self-host), set `LANGFUSE_*` env vars, instrument LLM calls; confirm traces and cost show up.
-- [ ] **LlamaFirewall**: Install, configure guardrail layers (at minimum: PromptGuard 2 for input scanning); wire into LLM response pipeline so all user-facing output passes through.
+- [x] **Promptfoo**: Install (CLI/npm), add eval config, run first eval; optionally wire into CI.
+- [x] **LiteLLM**: Deploy proxy (e.g. Docker/Helm), configure providers, set routing rules; point app at proxy URL.
+- [ ] **Langfuse**: Deploy (cloud or self-host), set `LANGFUSE_*` env vars, instrument LLM calls; confirm traces and cost show up. _(Code wired; production trace verification still required.)_
+- [ ] **LlamaFirewall**: Install, configure guardrail layers (at minimum: PromptGuard 2 for input scanning); wire into LLM response pipeline so all user-facing output passes through. _(Current repo uses LlamaGuard scanning, not full LlamaFirewall stack.)_
 - [ ] **Instructor**: Install (`pip install instructor`), replace raw `JSON.parse()` calls with Instructor-wrapped LLM calls; confirm structured output works with your LiteLLM gateway.
-- [ ] **Redis LangCache**: Deploy Redis Stack, configure semantic cache TTLs (1h conversational, 24h factual); wire into LiteLLM caching config.
-- [ ] **Prompt versioning**: Create `prompt_versions` table (or equivalent), implement load-by-version in app; add batch job or script for promotion/rollback.
-- [ ] **Feature flags for A/B**: Set up PostHog (or LaunchDarkly / Langfuse A/B); create flag(s) for prompt version routing; ensure every request logs `prompt_version` into `ai_generations`.
-- [ ] **Identity**: Same `userId` (and optionally `session_id`) in Langfuse, PostHog, and your DB for every request (playbook cardinal rule).
+- [x] **Redis LangCache**: Deploy Redis Stack, configure semantic cache TTLs (1h conversational, 24h factual); wire into LiteLLM caching config.
+- [x] **Prompt versioning**: Create `prompt_versions` table (or equivalent), implement load-by-version in app; add batch job or script for promotion/rollback.
+- [x] **Feature flags for A/B**: Set up PostHog (or LaunchDarkly / Langfuse A/B); create flag(s) for prompt version routing; ensure every request logs `prompt_version` into `ai_generations`.
+- [x] **Identity**: Same `userId` (and optionally `session_id`) in Langfuse, PostHog, and your DB for every request (playbook cardinal rule).
 
 ### Tier 2 (P1 — add when you have repeat users)
 
-- [ ] **Composio** (if agents need tools): Sign up, connect at least one toolkit (e.g. Slack or GitHub), wire agent SDK to Composio.
-- [ ] **Inception Mercury** (if using): Get API access; add Mercury as a provider in LiteLLM (e.g. via OpenRouter or direct); add routing rule for latency-sensitive tasks.
-- [ ] **Mem0 or Zep**: Choose based on needs (Mem0 for preference graphs, Zep for temporal recall); deploy and wire into context injection pipeline.
-- [ ] **DSPy**: Install, define first signature + metric function for your primary task; run optimizer with 50+ labeled examples; deploy winning prompt through prompt versioning table.
-- [ ] **RouteLLM**: Install, configure as custom router in LiteLLM; run A/B test comparing ML routing vs static routing for 2 weeks; measure cost savings.
-- [ ] **OpenPipe**: Connect to production LLM traffic; wait for 1,000+ high-quality examples; trigger first fine-tuning run; compare fine-tuned model eval scores vs prompted model.
+- [ ] **Composio** (if agents need tools): Sign up, connect at least one toolkit (e.g. Slack or GitHub), wire agent SDK to Composio. _(SDK/routes wired; external account + toolkit connection still pending.)_
+- [x] **Inception Mercury** (if using): Get API access; add Mercury as a provider in LiteLLM (e.g. via OpenRouter or direct); add routing rule for latency-sensitive tasks.
+- [ ] **Mem0 or Zep**: Choose based on needs (Mem0 for preference graphs, Zep for temporal recall); deploy and wire into context injection pipeline. _(Providers + routes exist; production enablement pending.)_
+- [ ] **DSPy**: Install, define first signature + metric function for your primary task; run optimizer with 50+ labeled examples; deploy winning prompt through prompt versioning table. _(Service/workflow exist; recurring optimization loop still pending.)_
+- [ ] **RouteLLM**: Install, configure as custom router in LiteLLM; run A/B test comparing ML routing vs static routing for 2 weeks; measure cost savings. _(Router code/config exists; controlled rollout + A/B evidence pending.)_
+- [ ] **OpenPipe**: Connect to production LLM traffic; wait for 1,000+ high-quality examples; trigger first fine-tuning run; compare fine-tuned model eval scores vs prompted model. _(Routes/SDK wired; dataset + first finetune pending.)_
 
 ### Tier 3 (P2 — add at scale)
 
-- [ ] **Braintrust**: Set up eval suite with 50+ cases; configure merge blocking in GitHub Actions; set statistical significance threshold.
-- [ ] **Qodo Cover**: Run coverage analysis on codebase; review generated tests; integrate into CI for gap detection.
-- [ ] **Gretel/Tonic**: Generate synthetic eval dataset from production samples; validate synthetic data quality against real data eval scores.
+- [ ] **Braintrust**: Set up eval suite with 50+ cases; configure merge blocking in GitHub Actions; set statistical significance threshold. _(Workflow exists, currently env-gated.)_
+- [ ] **Qodo Cover**: Run coverage analysis on codebase; review generated tests; integrate into CI for gap detection. _(Workflow exists, currently env-gated.)_
+- [ ] **Gretel/Tonic**: Generate synthetic eval dataset from production samples; validate synthetic data quality against real data eval scores. _(Gretel script exists; production pipeline validation pending.)_
 
 ---
 

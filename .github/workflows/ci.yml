@@ -74,6 +74,16 @@ jobs:
       - name: Check rate limiting
         run: bash scripts/check-rate-limit.sh
 
+      # Strategy pillar enforcement (§20–§22)
+      - name: Check context injection
+        run: bash scripts/check-context-injection.sh
+
+      - name: Check user identity consistency
+        run: bash scripts/check-user-identity.sh
+
+      - name: Check AI logging contract
+        run: bash scripts/check-ai-logging.sh
+
       # Destructive SQL detection
       - name: Check destructive SQL
         run: bash scripts/check-destructive-sql.sh

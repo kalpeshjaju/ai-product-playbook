@@ -1,0 +1,98 @@
+##
+# FILE PURPOSE: Strategy flywheel automation workflow
+#
+# WHY: Runs the moat feedback loops on a weekly cadence so strategy data stays
+#      fresh (few-shot examples, inferred preferences, moat health snapshots).
+#
+# HOW: Executes scripts/run-strategy-flywheel.ts with API/admin credentials.
+#      Optional task/user scopes come from repo variables or manual overrides.
+#
+# AUTHOR: Codex (GPT-5)
+# LAST UPDATED: 2026-03-02
+##
+
+name: Strategy Flywheel
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Mondays at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      task_types:
+        description: 'Comma-separated task types for /api/few-shot/build'
+        required: false
+        type: string
+      user_ids:
+        description: 'Comma-separated user IDs for /api/preferences/:userId/infer'
+        required: false
+        type: string
+      min_quality_score:
+        description: 'Minimum quality score for few-shot selection'
+        required: false
+        default: '0.85'
+        type: string
+      build_limit:
+        description: 'Max generations to evaluate per task type'
+        required: false
+        default: '20'
+        type: string
+
+jobs:
+  run-flywheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      API_URL: ${{ secrets.API_URL }}
+      API_KEY: ${{ secrets.API_KEY }}
+      ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+      FLYWHEEL_TASK_TYPES: ${{ vars.FLYWHEEL_TASK_TYPES }}
+      FLYWHEEL_USER_IDS: ${{ vars.FLYWHEEL_USER_IDS }}
+      FLYWHEEL_MIN_QUALITY_SCORE: ${{ vars.FLYWHEEL_MIN_QUALITY_SCORE }}
+      FLYWHEEL_BUILD_LIMIT: ${{ vars.FLYWHEEL_BUILD_LIMIT }}
+      FLYWHEEL_REPORT_PATH: strategy-flywheel-report.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Disable needrestart for zerox postinstall
+        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Apply workflow-dispatch overrides
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ -n "${{ inputs.task_types }}" ]; then
+            echo "FLYWHEEL_TASK_TYPES=${{ inputs.task_types }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.user_ids }}" ]; then
+            echo "FLYWHEEL_USER_IDS=${{ inputs.user_ids }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.min_quality_score }}" ]; then
+            echo "FLYWHEEL_MIN_QUALITY_SCORE=${{ inputs.min_quality_score }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.build_limit }}" ]; then
+            echo "FLYWHEEL_BUILD_LIMIT=${{ inputs.build_limit }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run strategy flywheel
+        run: npx tsx scripts/run-strategy-flywheel.ts
+
+      - name: Upload flywheel report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy-flywheel-report
+          path: strategy-flywheel-report.json
+          retention-days: 14
