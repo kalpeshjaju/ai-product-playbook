@@ -172,6 +172,38 @@ When flipping env vars on Railway, always check `railway logs` for the startup m
 
 ---
 
+## 2026-03-02: Enrichment Persistence + LiteLLM DB Disaster
+
+**What happened**: Enrichment pipeline was running (enrich + dedup-check jobs completing) but `enrichmentStatus` stayed `{}` in DB. Traced through: event-based persistence (`.then()`) → LLM returning empty results → LiteLLM "No connected db" error → connected pgvector-db to LiteLLM → broke LiteLLM completely (zero models). Railway CLI upload also broken (timeout on all `railway up`).
+
+**What worked**:
+- Smoke test immediately after deploy caught the persistence gap
+- DEBUG logging in worker.ts revealed returnvalue shape
+- Checking Railway env vars confirmed LITELLM_PROXY_URL was set
+
+**What failed**:
+- **Event-based persistence (`.then()` in BullMQ `completed` handler)**: Drizzle `.update().set().where()` resolves without error even when 0 rows match. "Enrichment persisted" logged but DB unchanged. Fix: use inline `await` with `.returning()` inside the processor callback.
+- **Connected pgvector-db to LiteLLM without testing**: Added `DATABASE_URL` to LiteLLM in prod. Triggered 89 Prisma migrations (incomplete — tables like `LiteLLM_SpendLogs` missing). Changed master key to `sk-` format. Reverted everything but model loading permanently broke. Config-file models (`store_model_in_db: false`) don't load after DB corruption cycle.
+- **Multiple rapid env var changes in prod**: Changed LiteLLM env vars 5+ times (add DB, change key, revert key, remove DB, revert key again). Each triggered a container restart with potentially corrupted state.
+- **Railway `railway up` timeout**: CLI upload endpoint (`backboard.railway.com`) consistently times out. Not a code issue — Railway infrastructure problem. Blocks all CLI-based deploys.
+- **`railway redeploy` after failed snapshot**: When the latest deployment failed (bad snapshot), `railway redeploy` refuses — "Cannot redeploy without a snapshot."
+
+**Lesson learned**:
+1. LiteLLM works fine WITHOUT a database — config.yaml mode is sufficient for model routing. The DB is only needed for virtual key management + spend tracking. Don't add it until you actually need those features.
+2. Never make cascading env var changes in production. Make ONE change, verify it works, then proceed. Reverting multiple changes doesn't guarantee you return to the original state.
+3. BullMQ `completed` event's `returnvalue` is unreliable for critical DB writes. Always do persistence inside the processor with `await`.
+4. When `railway up` fails, connect the service to GitHub for git-based deploys. The upload API is a single point of failure.
+
+**Recovery steps**:
+1. Connect litellm, ingestion-worker, playbook-api to GitHub repo in Railway dashboard (Settings → Source → Connect Repo)
+2. For litellm: Root `/`, Dockerfile `services/litellm/Dockerfile`, branch `claude/dedup-cross-codebase-patterns`
+3. For ingestion-worker: Root `/`, Dockerfile `Dockerfile.worker`, branch `claude/dedup-cross-codebase-patterns`
+4. Fresh Docker build will restore config.yaml model loading
+
+**Validation**: Pending — requires Railway deploys to go through
+
+---
+
 ## Anti-Pattern Registry
 
 > Quick-reference table. Add a row when you discover a new anti-pattern.
@@ -207,3 +239,8 @@ When flipping env vars on Railway, always check `railway logs` for the startup m
 | `AUTH_MODE=open` bypasses admin routes | Admin mutations accessible without `x-admin-key` in dev/test | Open mode relaxes user auth only; always enforce admin key | 2026-03-01 |
 | Refactor route → service without checking test assertions | Response shape changes (`body.document` → `body.documentId`) break tests | Grep tests for response field names before refactoring routes | 2026-03-01 |
 | Ingest route parses but doesn't persist | `/api/ingest` returned parsed text but wrote nothing to DB | Always wire ingestion to a persistence pipeline | 2026-03-01 |
+| Persist data in BullMQ `completed` event handler | `.then()` resolves even on 0-row updates — data silently lost | `await` persistence inside processor callback with `.returning()` | 2026-03-02 |
+| Connect fresh DB to LiteLLM in production | 89 incomplete Prisma migrations, model loading breaks permanently | LiteLLM config-file mode is sufficient; add DB only when key mgmt needed | 2026-03-02 |
+| Make multiple rapid env var changes in prod | Each triggers container restart; state corruption; hard to revert | One change → verify → next change. Never batch env var mutations | 2026-03-02 |
+| Rely on `railway up` as only deploy method | CLI upload times out when Railway infra has issues | Connect service to GitHub repo for git-based deploys (Settings → Source) | 2026-03-02 |
+| Chase symptoms instead of root causes | "Empty enrichment" → persistence bug → LLM bug → LiteLLM DB → broke everything worse | Trace the full data path before making ANY production changes | 2026-03-02 |

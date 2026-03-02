@@ -36,6 +36,16 @@ on:
         required: false
         default: '20'
         type: string
+      infer_all_limit:
+        description: 'When user_ids is empty, max users to infer in /infer-all'
+        required: false
+        default: '100'
+        type: string
+      infer_min_feedback_count:
+        description: 'When user_ids is empty, minimum feedback rows per user'
+        required: false
+        default: '3'
+        type: string
 
 jobs:
   run-flywheel:
@@ -52,6 +62,8 @@ jobs:
       FLYWHEEL_USER_IDS: ${{ vars.FLYWHEEL_USER_IDS }}
       FLYWHEEL_MIN_QUALITY_SCORE: ${{ vars.FLYWHEEL_MIN_QUALITY_SCORE }}
       FLYWHEEL_BUILD_LIMIT: ${{ vars.FLYWHEEL_BUILD_LIMIT }}
+      FLYWHEEL_INFER_ALL_LIMIT: ${{ vars.FLYWHEEL_INFER_ALL_LIMIT }}
+      FLYWHEEL_INFER_MIN_FEEDBACK_COUNT: ${{ vars.FLYWHEEL_INFER_MIN_FEEDBACK_COUNT }}
       FLYWHEEL_REPORT_PATH: strategy-flywheel-report.json
 
     steps:
@@ -64,8 +76,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+      - uses: ./.github/actions/disable-needrestart
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -84,6 +95,38 @@ jobs:
           fi
           if [ -n "${{ inputs.build_limit }}" ]; then
             echo "FLYWHEEL_BUILD_LIMIT=${{ inputs.build_limit }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.infer_all_limit }}" ]; then
+            echo "FLYWHEEL_INFER_ALL_LIMIT=${{ inputs.infer_all_limit }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.infer_min_feedback_count }}" ]; then
+            echo "FLYWHEEL_INFER_MIN_FEEDBACK_COUNT=${{ inputs.infer_min_feedback_count }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Preflight flywheel config
+        run: |
+          set -euo pipefail
+
+          if [ -z "${API_URL:-}" ] || [ -z "${API_KEY:-}" ] || [ -z "${ADMIN_API_KEY:-}" ]; then
+            echo "::error::Missing required secrets. Required: API_URL, API_KEY, ADMIN_API_KEY"
+            exit 1
+          fi
+
+          if [ -z "${FLYWHEEL_TASK_TYPES:-}" ]; then
+            echo "FLYWHEEL_TASK_TYPES=summarization,classification" >> "$GITHUB_ENV"
+            echo "::warning::FLYWHEEL_TASK_TYPES not set. Using default: summarization,classification"
+          fi
+
+          if [ -z "${FLYWHEEL_INFER_ALL_LIMIT:-}" ]; then
+            echo "FLYWHEEL_INFER_ALL_LIMIT=100" >> "$GITHUB_ENV"
+          fi
+
+          if [ -z "${FLYWHEEL_INFER_MIN_FEEDBACK_COUNT:-}" ]; then
+            echo "FLYWHEEL_INFER_MIN_FEEDBACK_COUNT=3" >> "$GITHUB_ENV"
+          fi
+
+          if [ -z "${FLYWHEEL_USER_IDS:-}" ]; then
+            echo "::notice::FLYWHEEL_USER_IDS not set. Runner will call /api/preferences/infer-all."
           fi
 
       - name: Run strategy flywheel

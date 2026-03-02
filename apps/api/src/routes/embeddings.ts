@@ -25,8 +25,7 @@ import { checkTokenBudget } from '../rate-limiter.js';
 import { checkCostBudget } from '../cost-guard.js';
 import { createLLMClient, withLangfuseHeaders, costLedger } from '@playbook/shared-llm';
 import type { AuthResult } from '../middleware/auth.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 /** Rough estimate for input tokens when provider usage metadata is unavailable. */
 function estimateTokens(charCount: number): number {
@@ -180,10 +179,6 @@ export async function handleEmbeddingRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in embedding routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'embedding', err);
   }
 }

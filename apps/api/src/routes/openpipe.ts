@@ -4,7 +4,8 @@
  * WHY: Tier 2 tooling — lets external clients log training data, trigger
  *      fine-tune jobs, and check job status through the API server.
  * HOW: Delegates to logTrainingData(), triggerFineTune(), getFineTuneStatus()
- *      from shared-llm. Fail-open when OPENPIPE_API_KEY is not set.
+ *      from shared-llm. Provider policy controls unavailability behavior:
+ *      open mode => enabled:false response, strict mode => 503.
  *
  * Routes:
  *   POST /api/openpipe/log             — log training data entry
@@ -12,14 +13,14 @@
  *   GET  /api/openpipe/finetune/:jobId — get fine-tune status
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-03-01
+ * LAST UPDATED: 2026-03-02
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { logTrainingData, triggerFineTune, getFineTuneStatus } from '@playbook/shared-llm';
+import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
 import type { TrainingEntry } from '@playbook/shared-llm';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import type { BodyParser } from '../types.js';
 
 export async function handleOpenPipeRoutes(
   req: IncomingMessage,
@@ -27,9 +28,15 @@ export async function handleOpenPipeRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
-  // Fail-open check
-  if (!process.env.OPENPIPE_API_KEY) {
-    res.end(JSON.stringify({ enabled: false, message: 'OPENPIPE_API_KEY not set' }));
+  const providerAvailable = enforceProviderAvailability('openpipe', res);
+  if (!providerAvailable) {
+    if (res.writableEnded) return;
+    res.end(JSON.stringify({
+      enabled: false,
+      provider: 'openpipe',
+      mode: getStrategyProviderMode(),
+      message: getProviderUnavailableMessage('openpipe'),
+    }));
     return;
   }
 

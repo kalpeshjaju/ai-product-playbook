@@ -3,8 +3,8 @@
  *
  * WHY: Tier 2 tooling — lets external clients add, search, list, and delete
  *      agent memories through the API server.
- * HOW: Delegates to createMemoryProvider() from shared-llm. Fail-open when
- *      MEM0_API_KEY is not set (returns { enabled: false }).
+ * HOW: Delegates to createMemoryProvider() from shared-llm. Provider policy
+ *      controls unavailability behavior (open => enabled:false, strict => 503).
  *
  * Routes:
  *   POST   /api/memory             — add a memory
@@ -13,13 +13,13 @@
  *   DELETE /api/memory/:id         — delete specific memory
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-03-01
+ * LAST UPDATED: 2026-03-02
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMemoryProvider, scanOutput } from '@playbook/shared-llm';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
+import { handleRouteError, type BodyParser } from '../types.js';
 const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
   ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
 
@@ -30,10 +30,15 @@ export async function handleMemoryRoutes(
   parseBody: BodyParser,
 ): Promise<void> {
   try {
-  // Fail-open check — return 503 so clients know memory is unavailable
-  if (!process.env.MEM0_API_KEY && !process.env.ZEP_API_KEY) {
-    res.statusCode = 503;
-    res.end(JSON.stringify({ enabled: false, message: 'No memory provider configured' }));
+  const providerAvailable = enforceProviderAvailability('memory', res);
+  if (!providerAvailable) {
+    if (res.writableEnded) return;
+    res.end(JSON.stringify({
+      enabled: false,
+      provider: 'memory',
+      mode: getStrategyProviderMode(),
+      message: getProviderUnavailableMessage('memory'),
+    }));
     return;
   }
 
@@ -130,10 +135,6 @@ export async function handleMemoryRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in memory routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'memory', err);
   }
 }

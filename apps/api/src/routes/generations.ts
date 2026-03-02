@@ -22,8 +22,7 @@ import { db, aiGenerations } from '../db/index.js';
 import { createGenerationLog } from '@playbook/shared-llm';
 import type { GenerationLogInput } from '@playbook/shared-llm';
 import type { AuthResult } from '../middleware/auth.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 /** Validate required fields for generation logging. */
 function validateGenerationInput(body: Record<string, unknown>): GenerationLogInput | string {
@@ -161,10 +160,6 @@ export async function handleGenerationRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in generation routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'generation', err);
   }
 }

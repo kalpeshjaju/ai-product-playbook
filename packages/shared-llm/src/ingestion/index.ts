@@ -24,7 +24,7 @@ export type {
   ScrapePayload,
   IngestionPayload,
 } from './pipeline/jobs.js';
-export { createIngestionWorker } from './pipeline/workers.js';
+export { createIngestionWorker, processIngestionJob } from './pipeline/workers.js';
 export { parseRedisConnection } from './pipeline/connection.js';
 export type { RedisConnectionOptions } from './pipeline/connection.js';
 export {

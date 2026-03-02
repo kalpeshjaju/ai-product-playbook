@@ -21,8 +21,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { eq, desc } from 'drizzle-orm';
 import { db, playbookEntries } from '../db/index.js';
-
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+import { handleRouteError, type BodyParser } from '../types.js';
 
 const VALID_CATEGORIES = new Set(['resilience', 'cost', 'quality', 'deployment']);
 const VALID_STATUSES = new Set(['active', 'draft', 'deprecated']);
@@ -193,10 +192,6 @@ export async function handleEntryRoutes(
     res.statusCode = 404;
     res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in entry routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'entry', err);
   }
 }

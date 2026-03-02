@@ -17,7 +17,7 @@
  *   POST   /api/preferences/infer-all       — admin bulk inference across users
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-03-01
+ * LAST UPDATED: 2026-03-02
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -25,8 +25,87 @@ import { eq, and, isNotNull, desc, sql } from 'drizzle-orm';
 import { db, userPreferences, aiGenerations } from '../db/index.js';
 import { inferPreferences } from '@playbook/shared-llm';
 import type { FeedbackSignal } from '@playbook/shared-llm';
+import { handleRouteError, type BodyParser } from '../types.js';
 
-type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
+interface InferenceSummary {
+  userId: string;
+  feedbackRows: number;
+  inferred: number;
+  skippedExplicit: number;
+}
+
+/** Build feedback signals for preference inference from the last N generations. */
+async function loadFeedbackSignals(userId: string, limit = 100): Promise<FeedbackSignal[]> {
+  const rows = await db
+    .select()
+    .from(aiGenerations)
+    .where(and(
+      eq(aiGenerations.userId, userId),
+      isNotNull(aiGenerations.userFeedback),
+    ))
+    .orderBy(desc(aiGenerations.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    userFeedback: r.userFeedback ?? 'ignored',
+    thumbs: r.thumbs,
+    model: r.model,
+    taskType: r.taskType,
+    latencyMs: r.latencyMs,
+    qualityScore: r.qualityScore ? parseFloat(r.qualityScore) : null,
+    userEditDiff: r.userEditDiff,
+  }));
+}
+
+/** Infer and persist preferences for one user, preserving explicit preferences. */
+async function inferForUser(userId: string): Promise<InferenceSummary> {
+  const signals = await loadFeedbackSignals(userId);
+  const inferred = inferPreferences(signals);
+
+  let skippedExplicit = 0;
+  for (const pref of inferred) {
+    const [existing] = await db
+      .select()
+      .from(userPreferences)
+      .where(and(
+        eq(userPreferences.userId, userId),
+        eq(userPreferences.preferenceKey, pref.preferenceKey),
+      ))
+      .limit(1);
+
+    if (existing && existing.source === 'explicit') {
+      skippedExplicit++;
+      continue;
+    }
+
+    if (existing) {
+      await db
+        .update(userPreferences)
+        .set({
+          preferenceValue: pref.preferenceValue,
+          confidence: pref.confidence.toFixed(2),
+          source: 'inferred',
+          updatedAt: new Date(),
+        })
+        .where(eq(userPreferences.id, existing.id));
+    } else {
+      await db.insert(userPreferences).values({
+        userId,
+        preferenceKey: pref.preferenceKey,
+        preferenceValue: pref.preferenceValue,
+        source: 'inferred',
+        confidence: pref.confidence.toFixed(2),
+      });
+    }
+  }
+
+  return {
+    userId,
+    feedbackRows: signals.length,
+    inferred: inferred.length,
+    skippedExplicit,
+  };
+}
 
 interface InferenceSummary {
   userId: string;
@@ -316,10 +395,6 @@ export async function handlePreferenceRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    process.stderr.write(`ERROR in preference routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'preference', err);
   }
 }

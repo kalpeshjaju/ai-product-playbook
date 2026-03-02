@@ -1,0 +1,7 @@
+name: Disable needrestart
+description: Remove needrestart to prevent interactive prompts during apt-get (zerox postinstall)
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true

@@ -64,6 +64,18 @@ describe('handleComposioRoutes', () => {
     expect(body.enabled).toBe(false);
   });
 
+  it('returns 503 in strict mode when API key not set', async () => {
+    vi.stubEnv('COMPOSIO_API_KEY', '');
+    vi.stubEnv('STRATEGY_PROVIDER_MODE', 'strict');
+    delete process.env.COMPOSIO_API_KEY;
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleComposioRoutes(req, res, '/api/composio/actions', createBodyParser({}));
+    expect(res._statusCode).toBe(503);
+    expect(res._body).toContain('strict mode');
+  });
+
   it('GET /api/composio/actions returns actions list', async () => {
     mockGetAvailableActions.mockResolvedValue([
       { name: 'SLACK_SEND', description: 'Send slack msg', appName: 'slack', parameters: {}, requiresAuth: true },

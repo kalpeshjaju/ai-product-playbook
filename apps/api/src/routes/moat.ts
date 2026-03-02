@@ -15,6 +15,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { sql, eq, gt } from 'drizzle-orm';
 import { db, aiGenerations, outcomes, fewShotBank, promptVersions } from '../db/index.js';
+import { handleRouteError } from '../types.js';
 
 export async function handleMoatRoutes(
   req: IncomingMessage,
@@ -114,10 +115,6 @@ export async function handleMoatRoutes(
       promptHealth: activePrompts,
     }));
   } catch (err) {
-    process.stderr.write(`ERROR in moat routes: ${err}\n`);
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
+    handleRouteError(res, 'moat', err);
   }
 }
