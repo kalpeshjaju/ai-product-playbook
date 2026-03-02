@@ -33,6 +33,8 @@
 
 ## Git Workflow
 
+- **NEVER commit directly to main.** Always create a feature branch first (`claude/<topic>`, `codex/<topic>`, etc.). A pre-commit hook blocks commits to main. Merge via PR or fast-forward after CI passes.
+- **Use git worktrees for isolation.** Multiple LLMs/terminals share this repo. If you don't use a worktree, another session's `git checkout` will silently switch your branch. Run `git worktree add .claude/worktrees/<name> -b <branch>` or use the worktree skill.
 - This repo has pre-push hooks and linter hooks. Before committing: (1) stash any untracked/modified test artifacts, (2) run the linter, (3) then commit and push. Anticipate hook failures — don't be surprised by them.
 - When the user says "commit and push" or "ship it", use a single streamlined flow: stage → commit with descriptive message → push. Do not over-explore or re-audit the codebase. If a `/ship` skill exists, use it.
 

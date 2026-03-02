@@ -20,13 +20,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
-COPY requirements.txt .
+COPY services/crawl4ai/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Crawl4AI browser (headless Chromium)
 RUN crawl4ai-setup
 
-COPY server.py .
+COPY services/crawl4ai/server.py .
 
 # Run as non-root (Semgrep: missing-user-entrypoint)
 RUN adduser --disabled-password --gecos '' appuser
