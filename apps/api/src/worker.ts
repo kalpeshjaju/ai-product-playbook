@@ -2,9 +2,12 @@
  * FILE PURPOSE: Standalone BullMQ worker process for ingestion pipeline
  * WHY: §19 — runs separately from the HTTP server so queue processing
  *      doesn't block API requests. Start via `npm run worker`.
+ *      Handles post-processing persistence (e.g. writing enrichment results to DB).
  */
 
 import { createIngestionWorker } from '@playbook/shared-llm';
+import { eq } from 'drizzle-orm';
+import { db, documents } from './db/index.js';
 
 const REDIS_URL = process.env.REDIS_URL;
 
@@ -17,8 +20,21 @@ const concurrency = Number(process.env.WORKER_CONCURRENCY) || 5;
 
 const worker = createIngestionWorker(REDIS_URL, concurrency);
 
-worker.on('completed', (job) => {
+worker.on('completed', (job, returnvalue) => {
   process.stderr.write(`INFO: Job ${job.id} (${job.data.type}) completed for doc ${job.data.documentId}\n`);
+
+  // Persist enrichment results to the documents table
+  if (job.data.type === 'enrich' && returnvalue && job.data.documentId) {
+    db.update(documents)
+      .set({ enrichmentStatus: returnvalue })
+      .where(eq(documents.id, job.data.documentId))
+      .then(() => {
+        process.stderr.write(`INFO: Enrichment persisted for doc ${job.data.documentId}\n`);
+      })
+      .catch((err: Error) => {
+        process.stderr.write(`ERROR: Failed to persist enrichment for doc ${job.data.documentId}: ${err.message}\n`);
+      });
+  }
 });
 
 worker.on('failed', (job, err) => {
