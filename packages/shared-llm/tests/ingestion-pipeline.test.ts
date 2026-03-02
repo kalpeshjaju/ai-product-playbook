@@ -81,9 +81,11 @@ describe('ingestion pipeline', () => {
       const payload: ReEmbedPayload = {
         oldModelId: 'text-embedding-ada-002',
         newModelId: 'text-embedding-3-small',
+        chunks: ['chunk-a', 'chunk-b'],
       };
       expect(payload.oldModelId).toBe('text-embedding-ada-002');
       expect(payload.newModelId).toBe('text-embedding-3-small');
+      expect(payload.chunks).toHaveLength(2);
     });
 
     it('FreshnessPayload has optional maxAgeDays', () => {
@@ -111,7 +113,7 @@ describe('ingestion pipeline', () => {
         { modelId: 'embed-v1', chunks: ['a'], chunkStrategy: 'fixed' },
         { content: 'text' },
         { contentHash: 'hash123' },
-        { oldModelId: 'old', newModelId: 'new' },
+        { oldModelId: 'old', newModelId: 'new', chunks: ['x'] },
         {},
         { url: 'https://example.com' },
       ];
@@ -140,7 +142,7 @@ describe('ingestion pipeline', () => {
       const reEmbedJob: IngestionJobData = {
         type: JobType.RE_EMBED,
         documentId: 'doc-4',
-        payload: { oldModelId: 'old', newModelId: 'new' },
+        payload: { oldModelId: 'old', newModelId: 'new', chunks: ['a', 'b'] },
       };
 
       const freshnessJob: IngestionJobData = {
