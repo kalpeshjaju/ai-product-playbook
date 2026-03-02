@@ -8,7 +8,6 @@ const mockCreateIngestionQueue = vi.fn().mockReturnValue({
   add: (...args: unknown[]) => mockQueueAdd(...args),
 });
 const mockPersistDocument = vi.fn();
-const mockSelect = vi.fn();
 
 vi.mock('@playbook/shared-llm', () => {
   class TestIngesterRegistry {
@@ -58,36 +57,7 @@ vi.mock('../src/services/document-persistence.js', () => ({
   persistDocument: (...args: unknown[]) => mockPersistDocument(...args),
 }));
 
-vi.mock('../src/db/index.js', () => ({
-  db: {
-    select: (...args: unknown[]) => mockSelect(...args),
-  },
-  documents: {
-    id: 'id',
-    contentHash: 'content_hash',
-  },
-  embeddings: {
-    sourceId: 'source_id',
-    modelId: 'model_id',
-    embedding: 'embedding',
-  },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  and: (...args: unknown[]) => args,
-  eq: (a: unknown, b: unknown) => [a, b],
-  ne: (a: unknown, b: unknown) => [a, b, '!='],
-}));
-
 import { handleIngestRoutes } from '../src/routes/ingest.js';
-
-function createSelectChain<T>(result: T) {
-  return {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(result),
-  };
-}
 
 function createRawReq(
   method: string,
@@ -106,21 +76,22 @@ function createRawReq(
   return req;
 }
 
+const defaultPersistResult = {
+  documentId: 'doc-123',
+  persisted: true,
+  duplicate: false,
+  chunksCreated: 3,
+  embeddingsGenerated: true,
+  embeddingModelId: 'text-embedding-3-small',
+  contentHash: 'persisted-hash-1',
+  partialFailure: false,
+};
+
 describe('/api/ingest', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.REDIS_URL = 'redis://localhost:6379';
     mockQueueAdd.mockResolvedValue({ id: 'job-1' });
-    mockPersistDocument.mockResolvedValue({
-      documentId: 'doc-123',
-      persisted: true,
-      duplicate: false,
-      chunksCreated: 3,
-      embeddingsGenerated: true,
-      embeddingModelId: 'text-embedding-3-small',
-      contentHash: 'persisted-hash-1',
-      partialFailure: false,
-    });
+    mockPersistDocument.mockResolvedValue(defaultPersistResult);
   });
 
   afterEach(() => {
@@ -137,12 +108,22 @@ describe('/api/ingest', () => {
     expect(JSON.parse(res._body)).toEqual({ supportedTypes: ['text/plain'] });
   });
 
-  it('POST /api/ingest enqueues enrichment + dedup with real dedup context', async () => {
-    mockSelect
-      .mockReturnValueOnce(createSelectChain([{ contentHash: 'old-hash' }]))
-      .mockReturnValueOnce(createSelectChain([{ embedding: [0.11, 0.22] }]))
-      .mockReturnValueOnce(createSelectChain([{ docId: 'doc-old', embedding: [0.12, 0.23] }]));
+  // This test must run BEFORE any test that sets REDIS_URL, because
+  // getQueue() caches the queue at module level once created.
+  it('POST /api/ingest returns queued=false when no REDIS_URL', async () => {
+    const req = createRawReq('POST', 'text/plain', Buffer.from('payload'));
+    const res = createMockRes();
 
+    await handleIngestRoutes(req, res, '/api/ingest');
+
+    expect(res._statusCode).toBe(201);
+    const body = JSON.parse(res._body) as Record<string, unknown>;
+    expect(body.queued).toBe(false);
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/ingest persists and enqueues fire-and-forget jobs', async () => {
+    process.env.REDIS_URL = 'redis://localhost:6379';
     const req = createRawReq('POST', 'text/plain', Buffer.from('Hello ingest world'), 'My doc');
     const res = createMockRes();
 
@@ -152,43 +133,33 @@ describe('/api/ingest', () => {
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.documentId).toBe('doc-123');
     expect(body.queued).toBe(true);
-    expect(mockQueueAdd).toHaveBeenCalledTimes(2);
+
+    // Fire-and-forget enqueues happen async — flush microtasks
+    await vi.waitFor(() => {
+      expect(mockQueueAdd).toHaveBeenCalledTimes(2);
+    });
+
+    const enrichCall = mockQueueAdd.mock.calls.find((call) => call[0] === 'enrich');
+    expect(enrichCall).toBeDefined();
+    expect((enrichCall?.[1] as { payload: { content: string } }).payload.content).toBe('Hello ingest world');
 
     const dedupCall = mockQueueAdd.mock.calls.find((call) => call[0] === 'dedup-check');
     expect(dedupCall).toBeDefined();
-    const dedupJob = dedupCall?.[1] as {
-      payload: {
-        contentHash: string;
-        embedding?: number[];
-        knownHashes?: string[];
-        existingEmbeddings?: Array<{ docId: string; embedding: number[] }>;
-      };
-    };
-    expect(dedupJob.payload.embedding).toEqual([0.11, 0.22]);
-    expect(dedupJob.payload.knownHashes).toEqual(['old-hash']);
-    expect(dedupJob.payload.existingEmbeddings).toEqual([
-      { docId: 'doc-old', embedding: [0.12, 0.23] },
-    ]);
+    expect((dedupCall?.[1] as { payload: { contentHash: string } }).payload.contentHash).toBe('ingest-hash-1');
   });
 
-  it('POST /api/ingest reports queued=false when any enqueue fails', async () => {
-    mockSelect
-      .mockReturnValueOnce(createSelectChain([]))
-      .mockReturnValueOnce(createSelectChain([]))
-      .mockReturnValueOnce(createSelectChain([]));
-
-    mockQueueAdd
-      .mockResolvedValueOnce({ id: 'job-enrich' })
-      .mockRejectedValueOnce(new Error('queue down'));
+  it('POST /api/ingest returns queued=true even if fire-and-forget fails later', async () => {
+    process.env.REDIS_URL = 'redis://localhost:6379';
+    mockQueueAdd.mockRejectedValue(new Error('queue down'));
 
     const req = createRawReq('POST', 'text/plain', Buffer.from('payload'));
     const res = createMockRes();
 
     await handleIngestRoutes(req, res, '/api/ingest');
 
+    // Response returns immediately — queue availability, not job success
     expect(res._statusCode).toBe(201);
     const body = JSON.parse(res._body) as Record<string, unknown>;
-    expect(body.queued).toBe(false);
+    expect(body.queued).toBe(true);
   });
 });
-

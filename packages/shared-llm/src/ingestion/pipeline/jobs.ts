@@ -20,7 +20,7 @@ export interface EnrichPayload {
   enrichments?: string[];
 }
 
-/** Payload for the DEDUP_CHECK job — detects duplicate documents by hash or embedding. */
+/** A stored embedding for an existing document, used for near-dedup comparison. */
 export interface ExistingEmbedding {
   docId: string;
   embedding: number[];
