@@ -28,4 +28,12 @@ describe('cosineSimilarity', () => {
     const b = [0.91, 0.09, 0.04];
     expect(cosineSimilarity(a, b)).toBeGreaterThan(0.99);
   });
+
+  it('returns 0 for mismatched-dimension vectors', () => {
+    expect(cosineSimilarity([1, 0, 0], [1, 0])).toBe(0);
+  });
+
+  it('returns 0 for empty vectors', () => {
+    expect(cosineSimilarity([], [])).toBe(0);
+  });
 });

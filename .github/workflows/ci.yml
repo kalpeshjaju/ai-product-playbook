@@ -209,14 +209,17 @@ jobs:
 
       - name: Wait for API health
         run: |
+          DELAY=1
           for i in $(seq 1 60); do
             if curl -sf http://localhost:3002/api/health > /dev/null 2>&1; then
               echo "API healthy after ${i}s"
               exit 0
             fi
-            sleep 1
+            sleep $DELAY
+            DELAY=$(( DELAY < 4 ? DELAY * 2 : 4 ))
           done
-          echo "API failed to start within 60s"
+          echo "::error::API failed to start within 60s"
+          curl -sf http://localhost:3002/api/health || true
           exit 1
 
       - name: Run contract tests
@@ -249,6 +252,7 @@ jobs:
 
       - name: Wait for web + admin servers
         run: |
+          DELAY=1
           for i in $(seq 1 120); do
             WEB=$(curl -sf http://localhost:3000 > /dev/null 2>&1 && echo ok || echo waiting)
             ADMIN=$(curl -sf http://localhost:3001 > /dev/null 2>&1 && echo ok || echo waiting)
@@ -256,9 +260,13 @@ jobs:
               echo "Web + Admin servers healthy after ${i}s"
               exit 0
             fi
-            sleep 1
+            echo "  attempt $i: web=$WEB admin=$ADMIN (backoff=${DELAY}s)"
+            sleep $DELAY
+            DELAY=$(( DELAY < 8 ? DELAY * 2 : 8 ))
           done
-          echo "Servers failed to start within 120s"
+          echo "::error::Servers failed to start within 120s"
+          curl -sf http://localhost:3000 || echo "web unreachable"
+          curl -sf http://localhost:3001 || echo "admin unreachable"
           exit 1
 
       - name: Run fullstack E2E tests

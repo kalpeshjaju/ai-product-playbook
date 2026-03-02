@@ -126,4 +126,58 @@ describe('AudioIngester', () => {
     const callUrl = vi.mocked(globalThis.fetch).mock.calls[0]![0] as string;
     expect(callUrl).not.toContain('diarize=true');
   });
+
+  it('retries on 429 and succeeds on next attempt', async () => {
+    const rateLimitResponse = { ok: false, status: 429 };
+    const successResponse = {
+      ok: true,
+      json: () => Promise.resolve({
+        results: {
+          channels: [{
+            alternatives: [{
+              transcript: 'Retry success',
+              confidence: 0.95,
+              words: [{ word: 'Retry', confidence: 0.95, speaker: 0, start: 0, end: 0.5 }],
+            }],
+          }],
+        },
+        metadata: { duration: 1.0 },
+      }),
+    };
+
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce(rateLimitResponse)
+      .mockResolvedValueOnce(successResponse);
+
+    const result = await ingester.ingest(Buffer.from('audio'), 'audio/wav');
+    expect(result).not.toBeNull();
+    expect(result!.text).toBe('Retry success');
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns null after exhausting retries on 500', async () => {
+    const serverError = { ok: false, status: 500 };
+    globalThis.fetch = vi.fn().mockResolvedValue(serverError);
+
+    const result = await ingester.ingest(Buffer.from('audio'), 'audio/wav');
+    expect(result).toBeNull();
+    // MAX_RETRIES=3 → initial + 3 retries = 4 attempts
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(4);
+  });
+
+  it('retries on network error and returns null after exhausting retries', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('ECONNRESET'));
+
+    const result = await ingester.ingest(Buffer.from('audio'), 'audio/wav');
+    expect(result).toBeNull();
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(4);
+  });
+
+  it('returns null immediately for non-retryable status (e.g. 403)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 403 });
+
+    const result = await ingester.ingest(Buffer.from('audio'), 'audio/wav');
+    expect(result).toBeNull();
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
+  });
 });

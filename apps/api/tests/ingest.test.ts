@@ -162,4 +162,78 @@ describe('/api/ingest', () => {
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.queued).toBe(true);
   });
+
+  it('POST /api/ingest returns 400 when Content-Type is missing', async () => {
+    const req = createRawReq('POST', '', Buffer.from('payload'));
+    // Overwrite content-type to empty
+    req.headers = {};
+    const res = createMockRes();
+
+    await handleIngestRoutes(req, res, '/api/ingest');
+
+    expect(res._statusCode).toBe(400);
+    expect(JSON.parse(res._body)).toEqual({ error: 'Content-Type header required' });
+  });
+
+  it('POST /api/ingest returns 400 for empty body', async () => {
+    const req = createRawReq('POST', 'text/plain', Buffer.alloc(0));
+    const res = createMockRes();
+
+    await handleIngestRoutes(req, res, '/api/ingest');
+
+    expect(res._statusCode).toBe(400);
+    expect(JSON.parse(res._body)).toEqual({ error: 'Empty body' });
+  });
+
+  it('POST /api/ingest returns 422 for unsupported Content-Type', async () => {
+    const req = createRawReq('POST', 'application/x-unsupported', Buffer.from('payload'));
+    const res = createMockRes();
+
+    await handleIngestRoutes(req, res, '/api/ingest');
+
+    expect(res._statusCode).toBe(422);
+    const body = JSON.parse(res._body) as Record<string, unknown>;
+    expect(body.error).toContain('Unsupported or failed ingestion');
+    expect(body.supportedTypes).toBeDefined();
+  });
+
+  it('POST /api/ingest returns 207 on partial failure (persist but no embeddings)', async () => {
+    mockPersistDocument.mockResolvedValue({
+      ...defaultPersistResult,
+      embeddingsGenerated: false,
+      partialFailure: true,
+    });
+
+    const req = createRawReq('POST', 'text/plain', Buffer.from('partial'));
+    const res = createMockRes();
+
+    await handleIngestRoutes(req, res, '/api/ingest');
+
+    expect(res._statusCode).toBe(207);
+    const body = JSON.parse(res._body) as Record<string, unknown>;
+    expect(body.persisted).toBe(true);
+    expect(body.embeddingsGenerated).toBe(false);
+  });
+
+  it('POST /api/ingest returns 500 when persistDocument throws', async () => {
+    mockPersistDocument.mockRejectedValue(new Error('DB connection lost'));
+
+    const req = createRawReq('POST', 'text/plain', Buffer.from('payload'));
+    const res = createMockRes();
+
+    await handleIngestRoutes(req, res, '/api/ingest');
+
+    expect(res._statusCode).toBe(500);
+    expect(JSON.parse(res._body)).toEqual({ error: 'Internal server error' });
+  });
+
+  it('returns 404 for unknown route', async () => {
+    const req = { method: 'GET', headers: {} } as IncomingMessage;
+    const res = createMockRes();
+
+    await handleIngestRoutes(req, res, '/api/ingest/unknown');
+
+    expect(res._statusCode).toBe(404);
+    expect(JSON.parse(res._body)).toEqual({ error: 'Not found' });
+  });
 });

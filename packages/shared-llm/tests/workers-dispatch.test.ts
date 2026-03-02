@@ -108,6 +108,16 @@ describe('processIngestionJob', () => {
     );
   });
 
+  it('throws for unknown job type', async () => {
+    const job = createJob({
+      type: 'nonexistent-type' as unknown as typeof JobType[keyof typeof JobType],
+      documentId: 'doc-1',
+      payload: {},
+    });
+
+    await expect(processIngestionJob(job)).rejects.toThrow('Unknown job type: nonexistent-type');
+  });
+
   it('parses freshness dates from payload before calling processFreshness', async () => {
     const payload: FreshnessPayload = {
       ingestedAt: '2026-01-01T00:00:00.000Z',
