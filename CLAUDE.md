@@ -63,7 +63,7 @@ Turborepo monorepo. All apps share `@playbook/shared-types` and `@playbook/share
 
 ### Routes
 
-**admin**: `/` (Users) | `/prompts` (Prompts) | `/costs` (Costs) | `/memory` (Memory)
+**admin**: `/` (Users) | `/prompts` (Prompts) | `/costs` (Costs) | `/memory` (Memory) | `/moat-health` (Moat Health)
 
 **web**: `/` (Home) | `/prompts` (Prompts) | `/costs` (Costs)
 

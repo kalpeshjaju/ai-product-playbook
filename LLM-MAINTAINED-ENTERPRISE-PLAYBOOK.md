@@ -793,29 +793,32 @@ What works: turning each rule into a control.
 ### The Enforcement Stack
 
 ```
-ENFORCEMENT LAYER (status for this bootstrap repo as of 2026-02-28)
+ENFORCEMENT LAYER (status for this bootstrap repo as of 2026-03-02)
 
 ├── PRE-COMMIT HOOKS (local, instant feedback)
 │   ├── Secrets scan via ggshield                              [IMPLEMENTED]
-│   ├── File-header checks                                     [PLANNED]
-│   ├── Commit-message format checks                           [PLANNED]
-│   └── "No console.log/no any" pre-commit shortcuts           [PLANNED]
+│   ├── File-header checks                                     [IMPLEMENTED][BLOCKING]
+│   ├── Commit-message format checks                           [IMPLEMENTED][BLOCKING]
+│   └── "No console.log/no any" pre-commit shortcuts           [IMPLEMENTED][BLOCKING]
 │
 ├── CI GATES (remote)
-│   ├── Type check + lint + tests (Turbo pipeline)             [IMPLEMENTED]
-│   ├── Architecture limits check script                       [IMPLEMENTED]
-│   ├── Python lint (ruff)                                     [IMPLEMENTED]
-│   ├── Doc freshness check                                    [STUB: warning mode]
-│   ├── Hallucination check                                    [STUB: warning mode]
+│   ├── Type check + lint + tests (Turbo pipeline)             [IMPLEMENTED][BLOCKING]
+│   ├── Architecture limits check script                       [IMPLEMENTED][BLOCKING]
+│   ├── Python lint (ruff)                                     [IMPLEMENTED][BLOCKING]
+│   ├── Doc freshness check                                    [IMPLEMENTED][BLOCKING]
+│   ├── Hallucination check                                    [IMPLEMENTED][BLOCKING]
 │   ├── Secret scan                                             [STUB: advisory/continue-on-error]
-│   ├── Build gate in main CI                                  [PLANNED]
-│   ├── npm audit + semgrep + container scan                   [PLANNED]
+│   ├── Build gate in main CI                                  [IMPLEMENTED][BLOCKING]
+│   ├── npm audit (with expiry-aware allowlist)                [IMPLEMENTED][BLOCKING]
 │   ├── PR template validation script                           [STUB]
-│   └── API contract sync script                                [STUB]
+│   ├── API contract sync script                               [IMPLEMENTED][BLOCKING]
+│   ├── Rate limit enforcement (token budget)                  [IMPLEMENTED][BLOCKING]
+│   ├── Guardrail validation (LlamaGuard)                      [IMPLEMENTED][BLOCKING]
+│   └── Preview deploy smoke tests                             [IMPLEMENTED][BLOCKING]
 │
 ├── PR TEMPLATE
 │   ├── Template sections exist                                 [IMPLEMENTED]
-│   └── CI enforcement for section completeness                 [STUB]
+│   └── CI enforcement for section completeness                 [IMPLEMENTED][BLOCKING]
 │
 ├── CODEOWNERS (who must approve what)
 │   ├── docs/PRODUCT.md, docs/CONSTRAINTS.md                   [IMPLEMENTED]
@@ -830,7 +833,7 @@ ENFORCEMENT LAYER (status for this bootstrap repo as of 2026-02-28)
 
 ### Doc Freshness Enforcement Script
 
-Reference implementation for blocking doc-freshness mode. In this bootstrap repo, the active script currently runs in warning mode ([STUB]) while project setup is in progress.
+Reference implementation for blocking doc-freshness mode. Now running in blocking mode ([IMPLEMENTED][BLOCKING]) as of 2026-03-01.
 
 ```bash
 #!/bin/bash
@@ -2324,7 +2327,7 @@ pipeline:
 
 ### Current-State Gate Snapshot (Implemented in This Repo)
 
-As of **2026-02-28**, this is what runs now:
+As of **2026-03-02**, this is what runs now:
 
 ```
 GATE                     COMMAND / SCRIPT                             STATUS
@@ -2334,10 +2337,18 @@ lint                     npx turbo run lint                           [IMPLEMENT
 unit_tests               npx turbo run test                           [IMPLEMENTED][BLOCKING]
 architecture_limits      python scripts/check_architecture_limits.py  [IMPLEMENTED][BLOCKING]
 python_lint              ruff check packages/ apps/                   [IMPLEMENTED][BLOCKING]
-doc_freshness            scripts/check_doc_freshness.sh               [STUB][WARNING ONLY]
-hallucination_check      scripts/hallucination_check.sh               [STUB][WARNING ONLY]
+doc_freshness            scripts/check_doc_freshness.sh               [IMPLEMENTED][BLOCKING]
+hallucination_check      scripts/hallucination_check.sh               [IMPLEMENTED][BLOCKING]
 secret_scan              ggshield GitHub Action                        [STUB][ADVISORY]
 llm_golden_traces        promptfoo-action workflow (path-triggered)   [IMPLEMENTED][CONDITIONAL]
+build_gate               npx turbo run build                          [IMPLEMENTED][BLOCKING]
+npm_audit                scripts/audit-with-allowlist.js              [IMPLEMENTED][BLOCKING]
+api_contract_sync        scripts/check-api-contracts.sh               [IMPLEMENTED][BLOCKING]
+rate_limit               token budget via Redis (§18)                 [IMPLEMENTED][BLOCKING]
+guardrail_validation     LlamaGuard via LiteLLM                       [IMPLEMENTED][BLOCKING]
+preview_deploy_smoke     smoke-prod.yml (API + Web + Admin)           [IMPLEMENTED][BLOCKING]
+cost_budget_guard        cost-guard.ts (§18 Denial-of-Wallet)         [IMPLEMENTED][BLOCKING]
+auth_enforcement         AUTH_MODE=strict + Clerk JWT                 [IMPLEMENTED][BLOCKING]
 ```
 
 ### Target Gate Matrix (Single Source of Truth for Production Project)
@@ -6241,9 +6252,10 @@ Prioritization strategy for timeout truncation Agent file header + ARCHITECTURE.
 
 ---
 
-**Version**: 6.5.0
+**Version**: 6.5.1
 **Status**: Bootstrap (mock-infra, staged enforcement)
-**Incorporates**: v6.4.0 + explicit status model (`[IMPLEMENTED]/[STUB]/[PLANNED]/[TARGET]`), mock-infra scope clarification, Section 11 split into current-state vs target gate matrices, and validation report grounding for this repo phase.
+**Incorporates**: v6.5.0 + moat health dashboard API + admin page (§22), enforcement stack tree updated (8 gates promoted from [STUB]/[PLANNED] to [IMPLEMENTED][BLOCKING], 3 new gates added), current-state gate snapshot updated with 8 new production gates.
+**Previous**: v6.5.0 — v6.4.0 + explicit status model (`[IMPLEMENTED]/[STUB]/[PLANNED]/[TARGET]`), mock-infra scope clarification, Section 11 split into current-state vs target gate matrices, and validation report grounding for this repo phase.
 **Previous**: v6.4.0 — v6.3.0 + moat stack expansion (8 new tool categories, 12 new Appendix A entries). New sections: LLM Output Guardrails (Section 7), Structured Output + Intelligent Routing + Semantic Caching tool rosters (Section 18), Eval & Optimization Tool Roster (Section 9), Agent Memory & State Management + Fine-Tuning Pipeline + Automated Prompt Optimization (Section 20), Moat Acceleration Tools (Section 22), AI Tooling Landscape Shifts (Appendix B). MOAT-STACK-SETUP.md expanded from 5 to 15 tools across 3 priority tiers.
 **Previous**: v6.3.0 — v6.2.0 + 4 expanded patterns from cross-project feedback review: monthly chaos test with full implementation (Section 9), prompt injection PR attack vectors with safe review pipeline (Section 7), doc freshness hallucination chain + graduated enforcement + playbook.config.yaml (Section 5), streaming-first ESLint rule config + TTFT SLO + exemption pattern (Section 16). 1 new Appendix D entry (chaos test catch rate).
 **Previous**: v6.2.0 — v6.1.0 + 7 LLM resilience patterns from production (ui-ux-audit-tool + job-matchmaker): multi-strategy JSON extraction (Section 18), data falsification prevention with `||` (Section 18), fallback rate monitoring (Section 18), prioritized processing under timeout (Section 18), timeout alignment across layers (Section 18), over-mocking tests detection (Section 17), dual-layer cost tracking at provider + agent levels (Section 18). 5 new entries in "What No Tool Solves" (items 11-15, Appendix B). 9 new rule classifications in Appendix D.

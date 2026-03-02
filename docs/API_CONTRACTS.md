@@ -829,6 +829,42 @@ Soft-delete a few-shot example (sets `isActive=false`).
 
 ---
 
+### `GET /api/moat-health`
+
+Moat health dashboard — aggregated flywheel velocity, quality metrics,
+few-shot coverage, outcome funnel, and prompt health.
+
+**Response** `200`:
+```json
+{
+  "flywheelVelocity": {
+    "generationsPerDay": 14.3,
+    "totalGenerations": 100,
+    "feedbackRatePct": 45.0
+  },
+  "quality": {
+    "avgQualityScore": 0.82,
+    "hallucinationRatePct": 5.2,
+    "thumbsUp": 80,
+    "thumbsDown": 12
+  },
+  "fewShotCoverage": [
+    { "taskType": "classification", "active": 10, "auto": 7, "manual": 3 }
+  ],
+  "outcomeFunnel": {
+    "totalGenerations": 100,
+    "withFeedback": 45,
+    "conversions": 20,
+    "abandoned": 5
+  },
+  "promptHealth": [
+    { "promptName": "job-classifier", "version": "v1.2.0", "evalScore": "0.85", "activePct": 100 }
+  ]
+}
+```
+
+---
+
 ## Cost Budget Guard
 
 Cost budget enforcement on `/api/chat*`, `/api/generate*`, `/api/documents*`, and `/api/embeddings*` routes (after rate limiter):

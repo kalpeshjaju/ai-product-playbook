@@ -18,6 +18,7 @@ import { checkCostBudget } from './cost-guard.js';
 import { verifyTurnstileToken } from './middleware/turnstile.js';
 import { handlePromptRoutes } from './routes/prompts.js';
 import { handleCostRoutes } from './routes/costs.js';
+import { handleMoatRoutes } from './routes/moat.js';
 import { handleMemoryRoutes } from './routes/memory.js';
 import { handleComposioRoutes } from './routes/composio.js';
 import { handleOpenPipeRoutes } from './routes/openpipe.js';
@@ -241,6 +242,12 @@ const server = createServer(async (req, res) => {
   // ─── Prompt versioning routes (§20) ───
   if (url.startsWith('/api/prompts')) {
     await handlePromptRoutes(req, res, url, parseBody);
+    return;
+  }
+
+  // ─── Moat health dashboard (§22) ───
+  if (url.startsWith('/api/moat-health')) {
+    await handleMoatRoutes(req, res, url);
     return;
   }
 

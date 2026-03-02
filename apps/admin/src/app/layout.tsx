@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/prompts', label: 'Prompts' },
   { href: '/costs', label: 'Costs' },
   { href: '/memory', label: 'Memory' },
+  { href: '/moat-health', label: 'Moat Health' },
 ];
 
 const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
