@@ -7,6 +7,13 @@ repos:
         stages: [pre-commit]
   - repo: local
     hooks:
+      - id: no-commit-to-main
+        name: Block direct commits to main
+        entry: bash scripts/block-main-commit.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
       - id: sync-claude-nav
         name: Sync CLAUDE.md navigation map
         entry: python3 scripts/sync_claude_nav.py
