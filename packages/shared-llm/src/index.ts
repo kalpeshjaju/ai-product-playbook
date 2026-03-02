@@ -95,12 +95,12 @@ export type { RequestLike, UserContext, LangfuseHeaders } from './identity/index
 // ─── Ingestion Pipeline (§19 Input Pillar) ───────────────────────────────────
 export type {
   IngestResult, IngestOptions, Ingester, ChunkStrategy, SourceType,
-  NearDedupResult, JobTypeValue, IngestionJobData, RedisConnectionOptions,
+  NearDedupResult, JobTypeValue, IngestionJobData, RedisConnectionOptions, EnrichResult,
 } from './ingestion/index.js';
 export {
   computeContentHash, IngesterRegistry,
   DocumentIngester, AudioIngester, ImageIngester, WebIngester, CsvIngester, ApiFeedIngester,
   computeFreshnessMultiplier, isHashDuplicate, cosineSimilarity, NEAR_DEDUP_THRESHOLD,
   chunkFixed, chunkSlidingWindow, chunkPerEntity, chunkSemantic, selectChunker,
-  createIngestionQueue, JobType, createIngestionWorker, parseRedisConnection,
+  createIngestionQueue, JobType, createIngestionWorker, processIngestionJob, parseRedisConnection,
 } from './ingestion/index.js';
