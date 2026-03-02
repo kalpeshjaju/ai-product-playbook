@@ -11,6 +11,14 @@ import { useState, useEffect } from 'react';
 import { trackEvent } from '../../hooks/use-analytics';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+const API_KEY = process.env.NEXT_PUBLIC_API_INTERNAL_KEY ?? '';
+
+/** Auth headers for client-side API calls (admin app is behind Clerk auth gate). */
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const h: Record<string, string> = { ...extra };
+  if (API_KEY) h['x-api-key'] = API_KEY;
+  return h;
+}
 
 interface MemoryEntry {
   id: string;
@@ -32,7 +40,7 @@ export default function MemoryPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${API_URL}/api/memory/${userId}`);
+        const res = await fetch(`${API_URL}/api/memory/${userId}`, { headers: authHeaders() });
         if (res.ok) {
           const data: unknown = await res.json();
           setMemories(Array.isArray(data) ? data as MemoryEntry[] : []);
@@ -48,7 +56,7 @@ export default function MemoryPage() {
 
   async function loadMemories() {
     try {
-      const res = await fetch(`${API_URL}/api/memory/${userId}`);
+      const res = await fetch(`${API_URL}/api/memory/${userId}`, { headers: authHeaders() });
       if (res.ok) {
         const data: unknown = await res.json();
         setMemories(Array.isArray(data) ? data as MemoryEntry[] : []);
@@ -64,7 +72,7 @@ export default function MemoryPage() {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     try {
-      const res = await fetch(`${API_URL}/api/memory/search?q=${encodeURIComponent(searchQuery)}&userId=${userId}`);
+      const res = await fetch(`${API_URL}/api/memory/search?q=${encodeURIComponent(searchQuery)}&userId=${userId}`, { headers: authHeaders() });
       if (res.ok) {
         const results = await res.json() as Array<{ entry: MemoryEntry; score: number }>;
         setSearchResults(results);
@@ -82,7 +90,7 @@ export default function MemoryPage() {
     try {
       const res = await fetch(`${API_URL}/api/memory`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ content: newContent, userId }),
       });
       if (res.ok) {
@@ -102,7 +110,7 @@ export default function MemoryPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this memory entry?')) return;
     try {
-      await fetch(`${API_URL}/api/memory/${id}`, { method: 'DELETE' });
+      await fetch(`${API_URL}/api/memory/${id}`, { method: 'DELETE', headers: authHeaders() });
       setMemories((prev) => prev.filter((m) => m.id !== id));
     } catch {
       setStatus('Delete failed');

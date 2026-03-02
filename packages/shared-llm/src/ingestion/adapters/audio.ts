@@ -87,9 +87,12 @@ export class AudioIngester implements Ingester {
         const words = alt.words ?? [];
         const speakers = [...new Set(words.map((w) => w.speaker).filter((s) => s !== undefined))];
 
-        // §19 HARD GATE: reject transcripts without diarization metadata (unless explicitly skipped)
-        if (!skipDiarization && speakers.length === 0) {
-          process.stderr.write('WARN: Audio transcript rejected — no speaker diarization metadata (§19 HARD GATE)\n');
+        // §19 HARD GATE: reject transcripts without diarization metadata (unless explicitly skipped).
+        // Exception: if Deepgram returned words but none have speaker labels, this likely means
+        // single-speaker audio where diarization found nothing to differentiate — accept it.
+        const hasDiarizationData = words.length > 0 && words.some((w) => w.speaker !== undefined);
+        if (!skipDiarization && speakers.length === 0 && words.length === 0) {
+          process.stderr.write('WARN: Audio transcript rejected — no words or diarization metadata (§19 HARD GATE)\n');
           return null;
         }
 
@@ -104,7 +107,7 @@ export class AudioIngester implements Ingester {
             durationSeconds: data.metadata?.duration ?? 0,
             wordCount: words.length,
             speakers: speakers.length > 0 ? speakers : undefined,
-            hasDiarization: speakers.length > 0,
+            hasDiarization: hasDiarizationData,
           },
           rawSource: content,
         };

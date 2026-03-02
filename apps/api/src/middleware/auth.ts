@@ -14,6 +14,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { createUserContext, type UserContext } from '@playbook/shared-llm';
 
 export type AuthTier = 'public' | 'user' | 'admin';
@@ -56,6 +57,7 @@ const ROUTE_RULES: RouteRule[] = [
   { prefix: '/api/prompts', methods: ['POST'], tier: 'admin' },
   { prefix: '/api/prompts', methods: ['PATCH'], tier: 'admin' },
   { prefix: '/api/ingest', methods: ['POST'], tier: 'admin' },
+  { prefix: '/api/moat-health', methods: ['GET'], tier: 'admin' },
 ];
 
 /** Determine the required auth tier for a given URL + method. */
@@ -103,35 +105,47 @@ export function getAuthMode(): AuthMode {
 
 // ─── API key validation ───
 
-let cachedApiKeys: Set<string> | null = null;
+/** SHA-256 hash a key for constant-time comparison without storing plaintext. */
+function hashKey(key: string): string {
+  return createHash('sha256').update(key).digest('hex');
+}
 
-function getValidApiKeys(): Set<string> {
-  if (cachedApiKeys) return cachedApiKeys;
+/** Constant-time string comparison to prevent timing attacks. */
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+let cachedApiKeyHashes: Set<string> | null = null;
+
+function getValidApiKeyHashes(): Set<string> {
+  if (cachedApiKeyHashes) return cachedApiKeyHashes;
   const raw = process.env.API_KEYS ?? '';
-  cachedApiKeys = new Set(
-    raw.split(',').map((k) => k.trim()).filter(Boolean),
+  cachedApiKeyHashes = new Set(
+    raw.split(',').map((k) => k.trim()).filter(Boolean).map(hashKey),
   );
   // API_INTERNAL_KEY is always valid (used by web/admin frontends)
   const internalKey = process.env.API_INTERNAL_KEY;
-  if (internalKey) cachedApiKeys.add(internalKey);
-  return cachedApiKeys;
+  if (internalKey) cachedApiKeyHashes.add(hashKey(internalKey));
+  return cachedApiKeyHashes;
 }
 
 /** For testing: clear the cached API keys so env changes take effect. */
 export function clearApiKeyCache(): void {
-  cachedApiKeys = null;
+  cachedApiKeyHashes = null;
 }
 
 function isValidApiKey(key: string): boolean {
-  const keys = getValidApiKeys();
-  return keys.has(key);
+  const hashes = getValidApiKeyHashes();
+  const incoming = hashKey(key);
+  return hashes.has(incoming);
 }
 
 function isValidAdminKey(req: IncomingMessage): boolean {
   const adminKey = process.env.ADMIN_API_KEY;
   const provided = req.headers['x-admin-key'];
-  if (!adminKey) return false;
-  return typeof provided === 'string' && provided === adminKey;
+  if (!adminKey || typeof provided !== 'string') return false;
+  return safeCompare(hashKey(provided), hashKey(adminKey));
 }
 
 // ─── Clerk JWT verification ───
@@ -199,10 +213,10 @@ export function validateAuthConfig(): void {
     return;
   }
 
-  const keys = getValidApiKeys();
+  const keyHashes = getValidApiKeyHashes();
   const hasClerk = Boolean(process.env.CLERK_SECRET_KEY);
 
-  if (keys.size === 0 && !hasClerk) {
+  if (keyHashes.size === 0 && !hasClerk) {
     throw new Error(
       'AUTH_MODE=strict but no auth providers configured. ' +
       'Set API_KEYS, API_INTERNAL_KEY, or CLERK_SECRET_KEY. ' +

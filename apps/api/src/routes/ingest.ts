@@ -73,7 +73,10 @@ export async function handleIngestRoutes(
         const chunks: Buffer[] = [];
         req.on('data', (chunk: Buffer) => chunks.push(chunk));
         req.on('end', () => resolve(Buffer.concat(chunks)));
-        req.on('error', () => resolve(Buffer.alloc(0)));
+        req.on('error', (err) => {
+          process.stderr.write(`WARN: Request stream error during ingest: ${err}\n`);
+          resolve(Buffer.alloc(0));
+        });
       });
 
       if (rawBody.length === 0) {
@@ -134,8 +137,12 @@ export async function handleIngestRoutes(
             documentId: docId,
             payload: { contentHash: ingestResult.contentHash },
           }),
-        ]).catch(() => {
-          process.stderr.write(`WARN: Failed to enqueue async jobs for doc ${docId}\n`);
+        ]).then((results) => {
+          for (const r of results) {
+            if (r.status === 'rejected') {
+              process.stderr.write(`WARN: Failed to enqueue async job for doc ${docId}: ${r.reason}\n`);
+            }
+          }
         });
       }
 

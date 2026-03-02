@@ -29,6 +29,7 @@ export async function handleMemoryRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
+  try {
   // Fail-open check — return 503 so clients know memory is unavailable
   if (!process.env.MEM0_API_KEY && !process.env.ZEP_API_KEY) {
     res.statusCode = 503;
@@ -128,4 +129,11 @@ export async function handleMemoryRoutes(
 
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
+  } catch (err) {
+    process.stderr.write(`ERROR in memory routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+  }
 }
