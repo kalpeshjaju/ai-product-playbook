@@ -36,10 +36,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Zerox postinstall runs apt-get for Ghostscript/LibreOffice/GraphicsMagick.
-      # needrestart prompts block non-interactive installs, so remove it first.
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+      - uses: ./.github/actions/disable-needrestart
 
       - run: npm ci --legacy-peer-deps
 
@@ -83,6 +80,9 @@ jobs:
 
       - name: Check AI logging contract
         run: bash scripts/check-ai-logging.sh
+
+      - name: Check strategy provider policy
+        run: bash scripts/check-strategy-provider-policy.sh
 
       # Destructive SQL detection
       - name: Check destructive SQL
@@ -196,8 +196,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+      - uses: ./.github/actions/disable-needrestart
 
       - run: npm ci --legacy-peer-deps
 
@@ -302,8 +301,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Disable needrestart for zerox postinstall
-        run: sudo apt-get remove -y needrestart > /dev/null 2>&1 || true
+      - uses: ./.github/actions/disable-needrestart
 
       - run: npm ci --legacy-peer-deps
 

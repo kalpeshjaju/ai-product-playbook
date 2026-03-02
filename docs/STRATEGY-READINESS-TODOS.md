@@ -1,11 +1,11 @@
 # Strategy Readiness TODOs (Sections 20–22)
 
 **Date:** 2026-03-02  
-**Scope:** Competitive moat execution, flywheel automation, personalization, and data-loop readiness.
+**Scope:** Competitive moat execution, flywheel automation, prompt promotion automation, personalization, and data-loop readiness.
 
 ## 1. Current state at a glance
 
-- **Implemented in code/workflows:** core moat schema, prompt A/B plumbing, preference/few-shot endpoints, moat-health endpoint, strategy hard-gate scripts, weekly flywheel workflow.
+- **Implemented in code/workflows:** core moat schema, prompt A/B plumbing, preference/few-shot endpoints, moat-health endpoint, strategy hard-gate scripts, weekly flywheel workflow, and scheduled prompt promotion loop workflow.
 - **Not yet production-real-world complete:** several integrations remain env-gated/fail-open, some tool stacks are only partially operational, and moat loop outcomes are not yet fully automated from production traffic.
 
 ## 2. Done (verified in repo)
@@ -28,29 +28,39 @@
   - Evidence: `scripts/check-context-injection.sh`, `scripts/check-user-identity.sh`, `scripts/check-ai-logging.sh`, `.github/workflows/ci.yml`
 - [x] **Weekly flywheel automation workflow now exists** (few-shot refresh, preference inference, moat snapshot report).
   - Evidence: `scripts/run-strategy-flywheel.ts`, `.github/workflows/strategy-flywheel.yml`
+- [x] **Bulk preference inference endpoint exists for automated loops** (`POST /api/preferences/infer-all`).
+  - Evidence: `apps/api/src/routes/preferences.ts`
+- [x] **Flywheel workflow now has config/secret preflight with infer-all fallback**.
+  - Evidence: `.github/workflows/strategy-flywheel.yml`, `scripts/run-strategy-flywheel.ts`
+- [x] **Strategy provider strictness policy implemented** (Composio/OpenPipe/Memory).
+  - Evidence: `apps/api/src/middleware/provider-policy.ts`, strategy routes + tests
+- [x] **Langfuse live verification gate added to production smoke flow**.
+  - Evidence: `scripts/check-langfuse-live.sh`, `.github/workflows/smoke-prod.yml`
+- [x] **Flywheel governance defaults are now documented and set as repo variables**.
+  - Evidence: `docs/runbooks/strategy-flywheel-governance.md`, GitHub Actions repo vars (`FLYWHEEL_*`)
+- [x] **Automated prompt promotion loop now exists** (scheduled evaluator with promote/rollback policy + report artifact).
+  - Evidence: `scripts/run-prompt-promotion-loop.ts`, `.github/workflows/prompt-promotion-loop.yml`, `apps/api/src/services/prompt-promotion-policy.ts`
 
 ## 3. P0 pending (must close for real-world production readiness)
 
-- [ ] **Enable production verification for Langfuse traces/costs** (not just wiring).
-  - Gap: code is instrumented, but this checklist still lacks hard evidence that production traces/cost ingestion is healthy.
-  - Close by: run workflow/manual check and store proof artifact from live env.
-- [ ] **Decide fail-open vs fail-closed policy for strategy-critical providers** (Composio, OpenPipe, memory).
-  - Gap: several integrations intentionally no-op when keys are missing.
-  - Close by: enforce strict mode in production or add explicit degradation SLO + alerting.
-- [ ] **Operationalize flywheel scope inputs** (`FLYWHEEL_TASK_TYPES`, `FLYWHEEL_USER_IDS`).
-  - Gap: workflow exists but depends on repo variables for task/user scope.
-  - Close by: configure vars + documented owner runbook.
+- [ ] **Capture a successful production smoke artifact for Langfuse live gate**.
+  - Gap: required secret/variable wiring is now in place, but no recorded passing smoke run artifact is linked in readiness docs.
+  - Close by: run `smoke-prod` API job and record run URL + output in readiness proof.
+- [ ] **Finalize production env settings for provider policy** (`STRATEGY_PROVIDER_MODE`, optional break-glass flag).
+  - Gap: code + runbook now define strict defaults, but live Railway env values and one verification run are still not recorded as proof.
+  - Close by: verify production env values and attach one strict-mode verification artifact.
 - [ ] **Add integration test for flywheel runner against live/staging API**.
   - Gap: current validation is local dry-run.
-  - Close by: CI/manual job that asserts successful non-dry-run execution and zero failures.
-- [ ] **Add guardrail around API credentials required by scheduled workflow**.
-  - Gap: workflow depends on `API_URL/API_KEY/ADMIN_API_KEY`; missing secret causes runtime failure only.
-  - Close by: preflight step that fails fast with explicit secret checklist output.
+  - Current blocker: workflow run `22565882446` failed on missing secrets (`API_URL`, `API_KEY`, `ADMIN_API_KEY`).
+  - Close by: configure required secrets, rerun workflow, and store successful run URL/artifact.
+- [x] **Add guardrail around API credentials required by scheduled workflow**.
+  - Closed by: preflight step in `strategy-flywheel.yml` that hard-fails on missing `API_URL/API_KEY/ADMIN_API_KEY`.
 
 ## 4. P1 pending (moat depth + compounding quality)
 
-- [ ] **Automate prompt promotion decisions from live outcomes** (not manual endpoint calls only).
-  - Gap: promote route exists, but no recurring evaluator that promotes/rolls back based on thresholds.
+- [ ] **Complete first production proof run of automated prompt promotion loop**.
+  - Gap: evaluator/automation now exists, but no recorded production artifact yet.
+  - Close by: set `PROMOTION_PROMPT_NAMES`, run workflow once, and store report/run URL.
 - [ ] **Schedule DSPy optimization cadence** (currently manual dispatch).
   - Gap: optimizer exists but is not part of automatic quality loops.
 - [ ] **RouteLLM rollout experiment** (ROUTELLM-enabled A/B against static routing).

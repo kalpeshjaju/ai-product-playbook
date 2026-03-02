@@ -4,19 +4,20 @@
  * WHY: Tier 2 tooling — lets external clients list available Composio actions
  *      and execute them through the API server.
  * HOW: Delegates to getAvailableActions() and executeAction() from shared-llm.
- *      Fail-open when COMPOSIO_API_KEY is not set.
+ *      Provider availability is controlled by strategy provider policy:
+ *      open mode => enabled:false response, strict mode => 503.
  *
  * Routes:
  *   GET  /api/composio/actions    — list available actions (?app=...)
  *   POST /api/composio/execute    — execute an action
  *
  * AUTHOR: Claude Opus 4.6
- * LAST UPDATED: 2026-03-01
+ * LAST UPDATED: 2026-03-02
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getAvailableActions, executeAction, scanOutput } from '@playbook/shared-llm';
-
+import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
 type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
   ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
@@ -27,9 +28,15 @@ export async function handleComposioRoutes(
   url: string,
   parseBody: BodyParser,
 ): Promise<void> {
-  // Fail-open check
-  if (!process.env.COMPOSIO_API_KEY) {
-    res.end(JSON.stringify({ enabled: false, message: 'COMPOSIO_API_KEY not set' }));
+  const providerAvailable = enforceProviderAvailability('composio', res);
+  if (!providerAvailable) {
+    if (res.writableEnded) return;
+    res.end(JSON.stringify({
+      enabled: false,
+      provider: 'composio',
+      mode: getStrategyProviderMode(),
+      message: getProviderUnavailableMessage('composio'),
+    }));
     return;
   }
 

@@ -7,7 +7,7 @@
 #      via workflow_dispatch with a target selector (all/api/web/admin).
 #
 # AUTHOR: Claude Opus 4.6
-# LAST UPDATED: 2026-03-01
+# LAST UPDATED: 2026-03-02
 ##
 
 name: Production Smoke Tests
@@ -53,7 +53,13 @@ jobs:
     env:
       API_URL: ${{ secrets.PRODUCTION_API_URL }}
       API_INTERNAL_KEY: ${{ secrets.API_INTERNAL_KEY }}
+      LANGFUSE_HOST: ${{ secrets.PRODUCTION_LANGFUSE_HOST || secrets.LANGFUSE_HOST }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_LIVE_REQUIRED: ${{ vars.LANGFUSE_LIVE_REQUIRED }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Check API health endpoint
         run: |
           echo "Checking API health at ${API_URL}/api/health"
@@ -106,6 +112,9 @@ jobs:
             cat /tmp/costs.json 2>/dev/null || true
             exit 1
           fi
+
+      - name: Verify Langfuse live endpoint
+        run: bash scripts/check-langfuse-live.sh
 
   smoke-web:
     name: Smoke Test — Web
