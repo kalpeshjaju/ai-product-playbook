@@ -83,7 +83,7 @@ Use this to get the stack "ready" without missing a piece.
 - [ ] **LlamaFirewall**: Install, configure guardrail layers (at minimum: PromptGuard 2 for input scanning); wire into LLM response pipeline so all user-facing output passes through. _(Current repo uses LlamaGuard scanning, not full LlamaFirewall stack.)_
 - [ ] **Instructor**: Install (`pip install instructor`), replace raw `JSON.parse()` calls with Instructor-wrapped LLM calls; confirm structured output works with your LiteLLM gateway.
 - [x] **Redis LangCache**: Deploy Redis Stack, configure semantic cache TTLs (1h conversational, 24h factual); wire into LiteLLM caching config.
-- [x] **Prompt versioning**: Create `prompt_versions` table (or equivalent), implement load-by-version in app; add batch job or script for promotion/rollback.
+- [x] **Prompt versioning**: Create `prompt_versions` table (or equivalent), implement load-by-version in app; add batch job or script for promotion/rollback. _(Scheduled workflow now exists: `.github/workflows/prompt-promotion-loop.yml`.)_
 - [x] **Feature flags for A/B**: Set up PostHog (or LaunchDarkly / Langfuse A/B); create flag(s) for prompt version routing; ensure every request logs `prompt_version` into `ai_generations`.
 - [x] **Identity**: Same `userId` (and optionally `session_id`) in Langfuse, PostHog, and your DB for every request (playbook cardinal rule).
 

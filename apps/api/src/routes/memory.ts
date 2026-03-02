@@ -16,10 +16,10 @@
  * LAST UPDATED: 2026-03-02
  */
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMemoryProvider, scanOutput } from '@playbook/shared-llm';
 import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
-import { handleRouteError, type BodyParser } from '../types.js';
+type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
   ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
 
@@ -135,6 +135,10 @@ export async function handleMemoryRoutes(
   res.statusCode = 404;
   res.end(JSON.stringify({ error: 'Not found' }));
   } catch (err) {
-    handleRouteError(res, 'memory', err);
+    process.stderr.write(`ERROR in memory routes: ${err}\n`);
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
   }
 }

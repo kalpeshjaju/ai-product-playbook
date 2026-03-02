@@ -16,11 +16,11 @@
  * LAST UPDATED: 2026-03-02
  */
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { logTrainingData, triggerFineTune, getFineTuneStatus } from '@playbook/shared-llm';
 import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
 import type { TrainingEntry } from '@playbook/shared-llm';
-import type { BodyParser } from '../types.js';
+type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 
 export async function handleOpenPipeRoutes(
   req: IncomingMessage,

@@ -1,11 +1,11 @@
 # Strategy Readiness TODOs (Sections 20–22)
 
 **Date:** 2026-03-02  
-**Scope:** Competitive moat execution, flywheel automation, personalization, and data-loop readiness.
+**Scope:** Competitive moat execution, flywheel automation, prompt promotion automation, personalization, and data-loop readiness.
 
 ## 1. Current state at a glance
 
-- **Implemented in code/workflows:** core moat schema, prompt A/B plumbing, preference/few-shot endpoints, moat-health endpoint, strategy hard-gate scripts, weekly flywheel workflow.
+- **Implemented in code/workflows:** core moat schema, prompt A/B plumbing, preference/few-shot endpoints, moat-health endpoint, strategy hard-gate scripts, weekly flywheel workflow, and scheduled prompt promotion loop workflow.
 - **Not yet production-real-world complete:** several integrations remain env-gated/fail-open, some tool stacks are only partially operational, and moat loop outcomes are not yet fully automated from production traffic.
 
 ## 2. Done (verified in repo)
@@ -36,18 +36,19 @@
   - Evidence: `apps/api/src/middleware/provider-policy.ts`, strategy routes + tests
 - [x] **Langfuse live verification gate added to production smoke flow**.
   - Evidence: `scripts/check-langfuse-live.sh`, `.github/workflows/smoke-prod.yml`
+- [x] **Flywheel governance defaults are now documented and set as repo variables**.
+  - Evidence: `docs/runbooks/strategy-flywheel-governance.md`, GitHub Actions repo vars (`FLYWHEEL_*`)
+- [x] **Automated prompt promotion loop now exists** (scheduled evaluator with promote/rollback policy + report artifact).
+  - Evidence: `scripts/run-prompt-promotion-loop.ts`, `.github/workflows/prompt-promotion-loop.yml`, `apps/api/src/services/prompt-promotion-policy.ts`
 
 ## 3. P0 pending (must close for real-world production readiness)
 
-- [ ] **Enforce Langfuse live gate in production runs** (`LANGFUSE_LIVE_REQUIRED=true` + secrets).
-  - Gap: live gate exists, but currently runs in optional mode when Langfuse secrets/flag are not configured.
-  - Close by: configure `PRODUCTION_LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and set `LANGFUSE_LIVE_REQUIRED=true`.
+- [ ] **Capture a successful production smoke artifact for Langfuse live gate**.
+  - Gap: required secret/variable wiring is now in place, but no recorded passing smoke run artifact is linked in readiness docs.
+  - Close by: run `smoke-prod` API job and record run URL + output in readiness proof.
 - [ ] **Finalize production env settings for provider policy** (`STRATEGY_PROVIDER_MODE`, optional break-glass flag).
-  - Gap: code now defaults to strict in production, but env policy ownership/runbook still needs explicit sign-off.
-  - Close by: set env defaults across Railway/Vercel + document break-glass procedure.
-- [ ] **Finalize flywheel scope governance** (`FLYWHEEL_TASK_TYPES`, optional `FLYWHEEL_USER_IDS`).
-  - Gap: workflow now supports infer-all fallback, but owner-level defaults/runbook still need explicit org sign-off.
-  - Close by: configure repo vars + add owner runbook entry.
+  - Gap: code + runbook now define strict defaults, but live Railway env values and one verification run are still not recorded as proof.
+  - Close by: verify production env values and attach one strict-mode verification artifact.
 - [ ] **Add integration test for flywheel runner against live/staging API**.
   - Gap: current validation is local dry-run.
   - Close by: CI/manual job that asserts successful non-dry-run execution and zero failures.
@@ -56,8 +57,9 @@
 
 ## 4. P1 pending (moat depth + compounding quality)
 
-- [ ] **Automate prompt promotion decisions from live outcomes** (not manual endpoint calls only).
-  - Gap: promote route exists, but no recurring evaluator that promotes/rolls back based on thresholds.
+- [ ] **Complete first production proof run of automated prompt promotion loop**.
+  - Gap: evaluator/automation now exists, but no recorded production artifact yet.
+  - Close by: set `PROMOTION_PROMPT_NAMES`, run workflow once, and store report/run URL.
 - [ ] **Schedule DSPy optimization cadence** (currently manual dispatch).
   - Gap: optimizer exists but is not part of automatic quality loops.
 - [ ] **RouteLLM rollout experiment** (ROUTELLM-enabled A/B against static routing).

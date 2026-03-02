@@ -1,0 +1,162 @@
+##
+# FILE PURPOSE: Automated prompt promotion/rollback workflow
+#
+# WHY: Strategy moat loop requires recurring promotion decisions from live
+#      outcomes, not only manual promotion endpoint calls.
+#
+# HOW: Runs scripts/run-prompt-promotion-loop.ts on schedule or dispatch,
+#      then uploads a JSON report artifact with decisions and actions.
+#
+# AUTHOR: Codex (GPT-5)
+# LAST UPDATED: 2026-03-02
+##
+
+name: Prompt Promotion Loop
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Mondays at 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      prompt_names:
+        description: 'Comma-separated prompt names'
+        required: false
+        type: string
+      lookback_days:
+        description: 'How many days of live outcomes to evaluate'
+        required: false
+        default: '7'
+        type: string
+      min_samples:
+        description: 'Minimum sample count before any decision'
+        required: false
+        default: '20'
+        type: string
+      min_acceptance_rate:
+        description: 'Promotion threshold for acceptance rate'
+        required: false
+        default: '0.75'
+        type: string
+      min_conversion_rate:
+        description: 'Promotion threshold for conversion rate'
+        required: false
+        default: '0.08'
+        type: string
+      rollback_max_acceptance_rate:
+        description: 'Rollback threshold for acceptance rate'
+        required: false
+        default: '0.55'
+        type: string
+      rollback_max_conversion_rate:
+        description: 'Rollback threshold for conversion rate'
+        required: false
+        default: '0.02'
+        type: string
+      dry_run:
+        description: 'Run without writing traffic updates'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+jobs:
+  run-promotion-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PROMOTION_PROMPT_NAMES: ${{ vars.PROMOTION_PROMPT_NAMES }}
+      PROMOTION_LOOKBACK_DAYS: ${{ vars.PROMOTION_LOOKBACK_DAYS }}
+      PROMOTION_MIN_SAMPLES: ${{ vars.PROMOTION_MIN_SAMPLES }}
+      PROMOTION_MIN_ACCEPTANCE_RATE: ${{ vars.PROMOTION_MIN_ACCEPTANCE_RATE }}
+      PROMOTION_MIN_CONVERSION_RATE: ${{ vars.PROMOTION_MIN_CONVERSION_RATE }}
+      PROMOTION_ROLLBACK_MAX_ACCEPTANCE_RATE: ${{ vars.PROMOTION_ROLLBACK_MAX_ACCEPTANCE_RATE }}
+      PROMOTION_ROLLBACK_MAX_CONVERSION_RATE: ${{ vars.PROMOTION_ROLLBACK_MAX_CONVERSION_RATE }}
+      PROMOTION_REPORT_PATH: prompt-promotion-report.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: ./.github/actions/disable-needrestart
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Apply workflow-dispatch overrides
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ -n "${{ inputs.prompt_names }}" ]; then
+            echo "PROMOTION_PROMPT_NAMES=${{ inputs.prompt_names }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.lookback_days }}" ]; then
+            echo "PROMOTION_LOOKBACK_DAYS=${{ inputs.lookback_days }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.min_samples }}" ]; then
+            echo "PROMOTION_MIN_SAMPLES=${{ inputs.min_samples }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.min_acceptance_rate }}" ]; then
+            echo "PROMOTION_MIN_ACCEPTANCE_RATE=${{ inputs.min_acceptance_rate }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.min_conversion_rate }}" ]; then
+            echo "PROMOTION_MIN_CONVERSION_RATE=${{ inputs.min_conversion_rate }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.rollback_max_acceptance_rate }}" ]; then
+            echo "PROMOTION_ROLLBACK_MAX_ACCEPTANCE_RATE=${{ inputs.rollback_max_acceptance_rate }}" >> "$GITHUB_ENV"
+          fi
+          if [ -n "${{ inputs.rollback_max_conversion_rate }}" ]; then
+            echo "PROMOTION_ROLLBACK_MAX_CONVERSION_RATE=${{ inputs.rollback_max_conversion_rate }}" >> "$GITHUB_ENV"
+          fi
+          echo "DRY_RUN=${{ inputs.dry_run }}" >> "$GITHUB_ENV"
+
+      - name: Preflight promotion loop config
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::Missing required secret: DATABASE_URL"
+            exit 1
+          fi
+
+          if [ -z "${PROMOTION_PROMPT_NAMES:-}" ]; then
+            echo "::error::PROMOTION_PROMPT_NAMES is not set. Configure repo variable or dispatch input."
+            exit 1
+          fi
+
+          if [ -z "${PROMOTION_LOOKBACK_DAYS:-}" ]; then
+            echo "PROMOTION_LOOKBACK_DAYS=7" >> "$GITHUB_ENV"
+          fi
+          if [ -z "${PROMOTION_MIN_SAMPLES:-}" ]; then
+            echo "PROMOTION_MIN_SAMPLES=20" >> "$GITHUB_ENV"
+          fi
+          if [ -z "${PROMOTION_MIN_ACCEPTANCE_RATE:-}" ]; then
+            echo "PROMOTION_MIN_ACCEPTANCE_RATE=0.75" >> "$GITHUB_ENV"
+          fi
+          if [ -z "${PROMOTION_MIN_CONVERSION_RATE:-}" ]; then
+            echo "PROMOTION_MIN_CONVERSION_RATE=0.08" >> "$GITHUB_ENV"
+          fi
+          if [ -z "${PROMOTION_ROLLBACK_MAX_ACCEPTANCE_RATE:-}" ]; then
+            echo "PROMOTION_ROLLBACK_MAX_ACCEPTANCE_RATE=0.55" >> "$GITHUB_ENV"
+          fi
+          if [ -z "${PROMOTION_ROLLBACK_MAX_CONVERSION_RATE:-}" ]; then
+            echo "PROMOTION_ROLLBACK_MAX_CONVERSION_RATE=0.02" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run prompt promotion loop
+        run: npx tsx scripts/run-prompt-promotion-loop.ts
+
+      - name: Upload promotion report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompt-promotion-report
+          path: prompt-promotion-report.json
+          retention-days: 14

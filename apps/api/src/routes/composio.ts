@@ -15,10 +15,10 @@
  * LAST UPDATED: 2026-03-02
  */
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getAvailableActions, executeAction, scanOutput } from '@playbook/shared-llm';
 import { enforceProviderAvailability, getStrategyProviderMode, getProviderUnavailableMessage } from '../middleware/provider-policy.js';
-import type { BodyParser } from '../types.js';
+type BodyParser = (req: IncomingMessage) => Promise<Record<string, unknown>>;
 const guardrailFailureMode = (process.env.LLAMAGUARD_FAILURE_MODE
   ?? (process.env.NODE_ENV === 'production' ? 'closed' : 'open')) as 'closed' | 'open';
 
