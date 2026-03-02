@@ -5,7 +5,9 @@
  *      Handles post-processing persistence (e.g. writing enrichment results to DB).
  */
 
-import { createIngestionWorker } from '@playbook/shared-llm';
+import { Worker } from 'bullmq';
+import { processIngestionJob, parseRedisConnection } from '@playbook/shared-llm';
+import type { IngestionJobData } from '@playbook/shared-llm';
 import { eq } from 'drizzle-orm';
 import { db, documents } from './db/index.js';
 
@@ -18,28 +20,37 @@ if (!REDIS_URL) {
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY) || 5;
 
-const worker = createIngestionWorker(REDIS_URL, concurrency);
+const worker = new Worker<IngestionJobData>(
+  'ingestion-pipeline',
+  async (job) => {
+    const result = await processIngestionJob(job);
 
-worker.on('completed', (job, returnvalue) => {
-  process.stderr.write(`INFO: Job ${job.id} (${job.data.type}) completed for doc ${job.data.documentId}\n`);
-
-  if (job.data.type === 'enrich' && job.data.documentId) {
-    process.stderr.write(`DEBUG: returnvalue type=${typeof returnvalue} truthy=${!!returnvalue} val=${JSON.stringify(returnvalue).slice(0, 200)}\n`);
-
-    if (returnvalue) {
-      const enrichment = typeof returnvalue === 'string' ? JSON.parse(returnvalue) as Record<string, unknown> : returnvalue as Record<string, unknown>;
-      process.stderr.write(`DEBUG: enrichment keys=${Object.keys(enrichment).join(',')}\n`);
-      db.update(documents)
+    // Persist enrichment results to DB (awaited — not fire-and-forget)
+    if (job.data.type === 'enrich' && result && job.data.documentId) {
+      const enrichment = result as Record<string, unknown>;
+      const [updated] = await db
+        .update(documents)
         .set({ enrichmentStatus: enrichment })
         .where(eq(documents.id, job.data.documentId))
-        .then(() => {
-          process.stderr.write(`INFO: Enrichment persisted for doc ${job.data.documentId}\n`);
-        })
-        .catch((err: Error) => {
-          process.stderr.write(`ERROR: Failed to persist enrichment for doc ${job.data.documentId}: ${err.message}\n`);
-        });
+        .returning({ id: documents.id });
+
+      if (updated) {
+        process.stderr.write(`INFO: Enrichment persisted for doc ${job.data.documentId}\n`);
+      } else {
+        process.stderr.write(`WARN: Enrichment update matched 0 rows for doc ${job.data.documentId}\n`);
+      }
     }
-  }
+
+    return result;
+  },
+  {
+    connection: parseRedisConnection(REDIS_URL),
+    concurrency,
+  },
+);
+
+worker.on('completed', (job) => {
+  process.stderr.write(`INFO: Job ${job.id} (${job.data.type}) completed for doc ${job.data.documentId}\n`);
 });
 
 worker.on('failed', (job, err) => {
