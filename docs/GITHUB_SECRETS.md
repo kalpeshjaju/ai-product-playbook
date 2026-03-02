@@ -26,6 +26,15 @@
 | `PRODUCTION_API_URL` | smoke-prod | Railway deployment URL (e.g., `https://playbook-api.up.railway.app`) |
 | `PRODUCTION_WEB_URL` | smoke-prod | Vercel production URL for web app |
 | `PRODUCTION_ADMIN_URL` | smoke-prod | Vercel production URL for admin app |
+| `PRODUCTION_LANGFUSE_HOST` | smoke-prod (Langfuse live gate) | Langfuse host URL (e.g., `https://cloud.langfuse.com`) |
+| `LANGFUSE_PUBLIC_KEY` | smoke-prod (Langfuse live gate) | Langfuse Project → API Keys |
+| `LANGFUSE_SECRET_KEY` | smoke-prod (Langfuse live gate) | Langfuse Project → API Keys |
+
+## Optional Variables (Actions → Variables)
+
+| Variable | Used By | Default |
+|----------|---------|---------|
+| `LANGFUSE_LIVE_REQUIRED` | smoke-prod (Langfuse live gate) | `false` |
 
 ## Optional (Tier 2/3 Eval Workflows)
 
