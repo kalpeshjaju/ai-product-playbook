@@ -275,7 +275,9 @@ Admin-only reset of all cost tracking data. Requires `x-admin-key` header matchi
 
 ### `POST /api/memory`
 
-Add a memory entry for a user/agent. Fail-open when memory provider not configured.
+Add a memory entry for a user/agent. Provider policy controls behavior when memory is unconfigured:
+- `open` mode: non-blocking disabled response
+- `strict` mode: `503` hard failure
 
 **Request body:**
 ```json
@@ -289,7 +291,8 @@ Add a memory entry for a user/agent. Fail-open when memory provider not configur
 
 **Response** `201`: `{ "id": "memory-uuid" }`
 **Response** `400`: `{ "error": "Required: content, userId" }`
-**Response** `200` (disabled): `{ "enabled": false, "message": "No memory provider configured" }`
+**Response** `200` (disabled/open): `{ "enabled": false, "provider": "memory", "mode": "open", "message": "No memory provider configured" }`
+**Response** `503` (strict): `{ "error": "memory provider unavailable in strict mode", ... }`
 
 ---
 
@@ -323,13 +326,14 @@ Delete a specific memory by ID.
 
 ### `GET /api/composio/actions?app=...`
 
-List available Composio actions. Fail-open when `COMPOSIO_API_KEY` not set.
+List available Composio actions. Provider policy controls behavior when Composio is unconfigured.
 
 **Query params:**
 - `app` — Optional app name filter (e.g., `slack`, `github`)
 
 **Response** `200`: Array of `{ name, description, appName, parameters, requiresAuth }`
-**Response** `200` (disabled): `{ "enabled": false, "message": "COMPOSIO_API_KEY not set" }`
+**Response** `200` (disabled/open): `{ "enabled": false, "provider": "composio", "mode": "open", "message": "COMPOSIO_API_KEY not set" }`
+**Response** `503` (strict): `{ "error": "composio provider unavailable in strict mode", ... }`
 
 ---
 
@@ -353,7 +357,7 @@ Execute a Composio action.
 
 ### `POST /api/openpipe/log`
 
-Log a training data entry for fine-tuning. Fail-open when `OPENPIPE_API_KEY` not set.
+Log a training data entry for fine-tuning. Provider policy controls behavior when OpenPipe is unconfigured.
 
 **Request body:**
 ```json
@@ -366,7 +370,8 @@ Log a training data entry for fine-tuning. Fail-open when `OPENPIPE_API_KEY` not
 
 **Response** `201`: `{ "logged": true }`
 **Response** `400`: `{ "error": "Required: messages (array)" }`
-**Response** `200` (disabled): `{ "enabled": false, "message": "OPENPIPE_API_KEY not set" }`
+**Response** `200` (disabled/open): `{ "enabled": false, "provider": "openpipe", "mode": "open", "message": "OPENPIPE_API_KEY not set" }`
+**Response** `503` (strict): `{ "error": "openpipe provider unavailable in strict mode", ... }`
 
 ---
 

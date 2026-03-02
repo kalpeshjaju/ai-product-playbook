@@ -68,9 +68,22 @@ describe('handleMemoryRoutes', () => {
     const req = createMockReq('GET');
     const res = createMockRes();
     await handleMemoryRoutes(req, res, '/api/memory/user1', createBodyParser({}));
-    expect(res._statusCode).toBe(503);
+    expect(res._statusCode).toBe(200);
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.enabled).toBe(false);
+  });
+
+  it('returns 503 in strict mode when no memory provider configured', async () => {
+    vi.stubEnv('MEM0_API_KEY', '');
+    vi.stubEnv('STRATEGY_PROVIDER_MODE', 'strict');
+    delete process.env.MEM0_API_KEY;
+    delete process.env.ZEP_API_KEY;
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handleMemoryRoutes(req, res, '/api/memory/user1', createBodyParser({}));
+    expect(res._statusCode).toBe(503);
+    expect(res._body).toContain('strict mode');
   });
 
   it('POST /api/memory validates required fields', async () => {

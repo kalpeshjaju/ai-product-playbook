@@ -64,6 +64,18 @@ describe('handleOpenPipeRoutes', () => {
     expect(body.enabled).toBe(false);
   });
 
+  it('returns 503 in strict mode when API key not set', async () => {
+    vi.stubEnv('OPENPIPE_API_KEY', '');
+    vi.stubEnv('STRATEGY_PROVIDER_MODE', 'strict');
+    delete process.env.OPENPIPE_API_KEY;
+
+    const req = createMockReq('POST');
+    const res = createMockRes();
+    await handleOpenPipeRoutes(req, res, '/api/openpipe/log', createBodyParser({}));
+    expect(res._statusCode).toBe(503);
+    expect(res._body).toContain('strict mode');
+  });
+
   it('POST /api/openpipe/log validates messages required', async () => {
     const req = createMockReq('POST');
     const res = createMockRes();
