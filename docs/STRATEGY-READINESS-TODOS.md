@@ -51,7 +51,8 @@
   - Close by: verify production env values and attach one strict-mode verification artifact.
 - [ ] **Add integration test for flywheel runner against live/staging API**.
   - Gap: current validation is local dry-run.
-  - Close by: CI/manual job that asserts successful non-dry-run execution and zero failures.
+  - Current blocker: workflow run `22565882446` failed on missing secrets (`API_URL`, `API_KEY`, `ADMIN_API_KEY`).
+  - Close by: configure required secrets, rerun workflow, and store successful run URL/artifact.
 - [x] **Add guardrail around API credentials required by scheduled workflow**.
   - Closed by: preflight step in `strategy-flywheel.yml` that hard-fails on missing `API_URL/API_KEY/ADMIN_API_KEY`.
 
