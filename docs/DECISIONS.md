@@ -116,6 +116,17 @@
 **Reason**: PII exposure and open CORS are P0 security blockers before external user access.
 **Consequences**: Admin panel must send `x-admin-key` for user listing. `ALLOWED_ORIGINS` must be set on Railway for cross-origin frontend access (already configured).
 
+### DEC-008: E2E Tests Self-Start Dev Servers Locally, Skip in CI [ACTIVE]
+**Date**: 2026-03-02
+**Author**: Claude Opus 4.6
+**Status**: ACTIVE
+**Revisit when**: E2E tests need headless CI with real dev servers (not mocked).
+
+**Problem**: Full-stack E2E tests (`playwright.e2e.config.ts`) required manually starting web + admin dev servers and Docker before running. CI skips these tests entirely (no dev servers available).
+**Decision**: (1) Playwright config uses `webServer` blocks to auto-start web (port 3000) and admin (port 3001) dev servers. (2) `E2E_SKIP_SERVER=1` or `CI=true` disables auto-start. (3) `test-e2e-infra.sh` accepts `--no-docker` flag for environments without Docker (e.g., local dev with external Postgres).
+**Reason**: Developers can run `npx playwright test --config=playwright.e2e.config.ts` without manual server setup. CI environments (where servers are pre-started or tests are skipped) set `E2E_SKIP_SERVER=1`.
+**Consequences**: `reuseExistingServer: true` means already-running servers are not killed. Docker is still recommended but not mandatory with `--no-docker`.
+
 ---
 
 ## SUPERSEDED Decisions
