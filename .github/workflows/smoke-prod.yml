@@ -3,11 +3,12 @@
 #
 # WHY: Validates that production services are actually reachable after deploy.
 #      Catches DNS, routing, and startup failures within minutes of deploy.
-# HOW: Triggered automatically after deploy workflows complete, or manually
+# HOW: Triggered automatically after Deploy API workflow completes, or manually
 #      via workflow_dispatch with a target selector (all/api/web/admin).
+#      Web and admin are deployed by Vercel git integration — no deploy workflow to chain from.
 #
 # AUTHOR: Claude Opus 4.6
-# LAST UPDATED: 2026-03-01
+# LAST UPDATED: 2026-03-02
 ##
 
 name: Production Smoke Tests
@@ -29,8 +30,6 @@ on:
   workflow_run:
     workflows:
       - 'Deploy API'
-      - 'Deploy Web'
-      - 'Deploy Admin'
     types:
       - completed
     branches: [main]
@@ -112,11 +111,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: >
-      (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.target == 'all' || github.event.inputs.target == 'web')) ||
-      (github.event_name == 'workflow_run' &&
-        github.event.workflow_run.name == 'Deploy Web' &&
-        github.event.workflow_run.conclusion == 'success')
+      github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.target == 'all' || github.event.inputs.target == 'web')
     env:
       WEB_URL: ${{ secrets.PRODUCTION_WEB_URL }}
     steps:
@@ -160,11 +156,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: >
-      (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.target == 'all' || github.event.inputs.target == 'admin')) ||
-      (github.event_name == 'workflow_run' &&
-        github.event.workflow_run.name == 'Deploy Admin' &&
-        github.event.workflow_run.conclusion == 'success')
+      github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.target == 'all' || github.event.inputs.target == 'admin')
     env:
       ADMIN_URL: ${{ secrets.PRODUCTION_ADMIN_URL }}
     steps:

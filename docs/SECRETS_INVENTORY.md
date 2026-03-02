@@ -31,7 +31,7 @@
 | LiteLLM | LITELLM_API_KEY | yes | | | | LiteLLM |
 | LiteLLM | LITELLM_MASTER_KEY | | yes | | | LiteLLM Master |
 | LiteLLM | LITELLM_PROXY_URL | yes | | | | LiteLLM (URL) |
-| Railway | RAILWAY_TOKEN | yes | | | | Railway |
+| Railway | RAILWAY_TOKEN | yes (monitoring only) | | | | Railway |
 | Railway | DATABASE_URL | yes | | | | Railway DB |
 | Railway | REDIS_HOST | | yes | | | Railway Redis |
 | Railway | REDIS_PASSWORD | | yes | | | Railway Redis |
