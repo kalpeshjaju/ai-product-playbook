@@ -2,12 +2,10 @@
  * FILE PURPOSE: Standalone BullMQ worker process for ingestion pipeline
  * WHY: §19 — runs separately from the HTTP server so queue processing
  *      doesn't block API requests. Start via `npm run worker`.
- *      Wraps processIngestionJob to persist enrichment results to DB.
+ *      Handles post-processing persistence (e.g. writing enrichment results to DB).
  */
 
-import { Worker } from 'bullmq';
-import { processIngestionJob, parseRedisConnection } from '@playbook/shared-llm';
-import type { IngestionJobData, EnrichResult } from '@playbook/shared-llm';
+import { createIngestionWorker } from '@playbook/shared-llm';
 import { eq } from 'drizzle-orm';
 import { db, documents } from './db/index.js';
 
@@ -20,28 +18,28 @@ if (!REDIS_URL) {
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY) || 5;
 
-const worker = new Worker<IngestionJobData>(
-  'ingestion-pipeline',
-  async (job) => {
-    const result = await processIngestionJob(job);
+const worker = createIngestionWorker(REDIS_URL, concurrency);
 
-    // Persist enrichment results directly after processing (not via events)
-    if (job.data.type === 'enrich' && result && job.data.documentId) {
-      const enrichment = result as EnrichResult;
-      await db.update(documents)
-        .set({ enrichmentStatus: enrichment })
-        .where(eq(documents.id, job.data.documentId));
-      process.stderr.write(`INFO: Enrichment persisted for doc ${job.data.documentId}\n`);
-    }
-  },
-  {
-    connection: parseRedisConnection(REDIS_URL),
-    concurrency,
-  },
-);
-
-worker.on('completed', (job) => {
+worker.on('completed', (job, returnvalue) => {
   process.stderr.write(`INFO: Job ${job.id} (${job.data.type}) completed for doc ${job.data.documentId}\n`);
+
+  if (job.data.type === 'enrich' && job.data.documentId) {
+    process.stderr.write(`DEBUG: returnvalue type=${typeof returnvalue} truthy=${!!returnvalue} val=${JSON.stringify(returnvalue).slice(0, 200)}\n`);
+
+    if (returnvalue) {
+      const enrichment = typeof returnvalue === 'string' ? JSON.parse(returnvalue) as Record<string, unknown> : returnvalue as Record<string, unknown>;
+      process.stderr.write(`DEBUG: enrichment keys=${Object.keys(enrichment).join(',')}\n`);
+      db.update(documents)
+        .set({ enrichmentStatus: enrichment })
+        .where(eq(documents.id, job.data.documentId))
+        .then(() => {
+          process.stderr.write(`INFO: Enrichment persisted for doc ${job.data.documentId}\n`);
+        })
+        .catch((err: Error) => {
+          process.stderr.write(`ERROR: Failed to persist enrichment for doc ${job.data.documentId}: ${err.message}\n`);
+        });
+    }
+  }
 });
 
 worker.on('failed', (job, err) => {
