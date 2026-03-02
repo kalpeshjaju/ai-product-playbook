@@ -34,7 +34,10 @@ export default function MemoryPage() {
       try {
         const res = await fetch(`${API_URL}/api/memory/${userId}`);
         if (res.ok) {
-          setMemories(await res.json() as MemoryEntry[]);
+          const data: unknown = await res.json();
+          setMemories(Array.isArray(data) ? data as MemoryEntry[] : []);
+        } else {
+          setStatus('Memory service unavailable');
         }
       } catch {
         setStatus('Could not load memories');
@@ -47,7 +50,10 @@ export default function MemoryPage() {
     try {
       const res = await fetch(`${API_URL}/api/memory/${userId}`);
       if (res.ok) {
-        setMemories(await res.json() as MemoryEntry[]);
+        const data: unknown = await res.json();
+        setMemories(Array.isArray(data) ? data as MemoryEntry[] : []);
+      } else {
+        setStatus('Memory service unavailable');
       }
     } catch {
       setStatus('Could not load memories');

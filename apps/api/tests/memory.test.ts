@@ -68,7 +68,7 @@ describe('handleMemoryRoutes', () => {
     const req = createMockReq('GET');
     const res = createMockRes();
     await handleMemoryRoutes(req, res, '/api/memory/user1', createBodyParser({}));
-    expect(res._statusCode).toBe(200);
+    expect(res._statusCode).toBe(503);
     const body = JSON.parse(res._body) as Record<string, unknown>;
     expect(body.enabled).toBe(false);
   });

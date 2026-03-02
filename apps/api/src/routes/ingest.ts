@@ -132,7 +132,7 @@ export async function handleIngestRoutes(
           queue.add(JobType.DEDUP_CHECK, {
             type: 'dedup-check',
             documentId: docId,
-            payload: { contentHash: ingestResult.contentHash, embedding: [] },
+            payload: { contentHash: ingestResult.contentHash },
           }),
         ]).catch(() => {
           process.stderr.write(`WARN: Failed to enqueue async jobs for doc ${docId}\n`);

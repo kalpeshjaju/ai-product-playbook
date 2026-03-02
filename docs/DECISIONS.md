@@ -127,6 +127,17 @@
 **Reason**: Developers can run `npx playwright test --config=playwright.e2e.config.ts` without manual server setup. CI environments (where servers are pre-started or tests are skipped) set `E2E_SKIP_SERVER=1`.
 **Consequences**: `reuseExistingServer: true` means already-running servers are not killed. Docker is still recommended but not mandatory with `--no-docker`.
 
+### DEC-009: Ingest Route Uses Fire-and-Forget Queue Dispatch [ACTIVE]
+**Date**: 2026-03-02
+**Author**: Claude Opus 4.6
+**Status**: ACTIVE
+**Revisit when**: Queue observability requires synchronous enqueue confirmation in the HTTP response.
+
+**Problem**: An earlier implementation moved dedup context hydration (3 DB queries, ~1.2MB embeddings) into the ingest route, blocking the HTTP response until queue dispatch completed.
+**Decision**: Ingest route enqueues jobs with minimal payload (`contentHash` only) via fire-and-forget (`Promise.allSettled` + `.catch()`). Workers hydrate their own context. `queued` response field reflects queue availability, not job success.
+**Reason**: Ingest latency is user-facing. Queue jobs are background work. Workers have dedicated DB connections and can query context without blocking the request path.
+**Consequences**: DEDUP_CHECK runs in degraded mode until worker-side hydration is implemented (gracefully skips hash/near dedup when no context provided).
+
 ---
 
 ## SUPERSEDED Decisions

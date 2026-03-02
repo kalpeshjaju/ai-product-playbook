@@ -1,3 +1,5 @@
-crawl4ai>=0.4.0
-fastapi>=0.115.0
-uvicorn>=0.34.0
+# Crawl4AI web scraping service dependencies
+# Pinned for deterministic installs — update explicitly, not via resolver drift
+crawl4ai==0.4.248
+fastapi==0.115.8
+uvicorn==0.34.0

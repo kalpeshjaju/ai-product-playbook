@@ -28,6 +28,7 @@ describe('RE_EMBED worker processor', () => {
         payload: {
           oldModelId: 'text-embedding-ada-002',
           newModelId: 'text-embedding-3-small',
+          chunks: ['chunk 1'],
         } satisfies ReEmbedPayload,
       },
       log: vi.fn(),
@@ -50,6 +51,7 @@ describe('RE_EMBED worker processor', () => {
         payload: {
           oldModelId: 'ada-002',
           newModelId: 'text-embedding-3-small',
+          chunks: [],
         } satisfies ReEmbedPayload,
       },
       log: vi.fn(),

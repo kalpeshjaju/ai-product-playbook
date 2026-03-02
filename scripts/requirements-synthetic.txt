@@ -1,5 +1,6 @@
 # Synthetic eval data generation dependencies
-gretel-client>=0.18.0
-psycopg2-binary>=2.9.0
-python-dotenv>=1.0.0
-pandas>=2.0.0
+# Pinned for deterministic installs — update explicitly, not via resolver drift
+gretel-client==0.18.3
+psycopg2-binary==2.9.10
+python-dotenv==1.0.1
+pandas==2.2.3
