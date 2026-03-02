@@ -152,6 +152,7 @@ export const documents = pgTable(
     chunkCount: integer('chunk_count').default(0).notNull(),
     embeddingModelId: text('embedding_model_id'),
     ingestedAt: timestamp('ingested_at', { withTimezone: true }).defaultNow().notNull(),
+    sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }),
     validUntil: timestamp('valid_until', { withTimezone: true }),
     metadata: jsonb('metadata'),
     // §19 Input Pillar — raw source storage, chunking, enrichment tracking

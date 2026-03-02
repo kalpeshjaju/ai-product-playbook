@@ -30,14 +30,15 @@ export class AudioIngester implements Ingester {
       return null;
     }
 
-    const diarize = options?.metadata?.diarize === true;
+    // §19 HARD GATE: diarization is mandatory unless explicitly opted out (skipDiarization: true)
+    const skipDiarization = options?.metadata?.skipDiarization === true;
     const keywords = options?.metadata?.keywords as string[] | undefined;
 
     const params = new URLSearchParams({
       model: 'nova-2',
       language: 'en',
       punctuate: 'true',
-      ...(diarize ? { diarize: 'true' } : {}),
+      ...(!skipDiarization ? { diarize: 'true' } : {}),
     });
 
     if (keywords?.length) {
@@ -83,6 +84,15 @@ export class AudioIngester implements Ingester {
         const alt = data.results?.channels?.[0]?.alternatives?.[0];
         if (!alt?.transcript) return null;
 
+        const words = alt.words ?? [];
+        const speakers = [...new Set(words.map((w) => w.speaker).filter((s) => s !== undefined))];
+
+        // §19 HARD GATE: reject transcripts without diarization metadata (unless explicitly skipped)
+        if (!skipDiarization && speakers.length === 0) {
+          process.stderr.write('WARN: Audio transcript rejected — no speaker diarization metadata (§19 HARD GATE)\n');
+          return null;
+        }
+
         return {
           text: alt.transcript,
           sourceType: 'audio',
@@ -92,8 +102,9 @@ export class AudioIngester implements Ingester {
             ...options?.metadata,
             confidence: alt.confidence ?? 0,
             durationSeconds: data.metadata?.duration ?? 0,
-            wordCount: alt.words?.length ?? 0,
-            speakers: diarize ? [...new Set(alt.words?.map((w) => w.speaker).filter((s) => s !== undefined))] : undefined,
+            wordCount: words.length,
+            speakers: speakers.length > 0 ? speakers : undefined,
+            hasDiarization: speakers.length > 0,
           },
           rawSource: content,
         };
