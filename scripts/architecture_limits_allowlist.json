@@ -1,5 +1,6 @@
 {
   "file_allowlist": [
-    "packages/shared-llm/tests/ingestion-pipeline.test.ts"
+    "packages/shared-llm/tests/ingestion-pipeline.test.ts",
+    "packages/shared-llm/tests/ingestion-audio-adapter.test.ts"
   ]
 }

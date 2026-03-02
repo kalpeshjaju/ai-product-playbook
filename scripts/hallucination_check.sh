@@ -180,7 +180,7 @@ if [ -f ".env.example" ]; then
       | sed 's/process\.env\.//' || true
   done | sort -u)
 
-  DOCUMENTED_ENVS=$(grep -oE '^[A-Z_]+' .env.example | sort -u)
+  DOCUMENTED_ENVS=$(grep -oE '^[A-Z0-9_]+' .env.example | sort -u)
   FRAMEWORK_VARS="CI NODE_ENV PYTHONPATH PATH HOME USER GITHUB_TOKEN GITHUB_EVENT_PATH GITHUB_ACTIONS GITHUB_PR_NUMBER DATABASE_URL PORT"
 
   MISSING_ENVS=""
@@ -200,6 +200,35 @@ if [ -f ".env.example" ]; then
   fi
 else
   add_warning "No .env.example found — cannot verify env vars"
+fi
+
+REPORT+=$'\n'
+
+# ═══════════════════════════════════════════════════════════════════════
+# CHECK 4: §19 HARD GATE — vector operations must include model_id
+# ═══════════════════════════════════════════════════════════════════════
+REPORT+="### 4. Vector Model ID Check (§19 HARD GATE)"$'\n'
+
+MISSING_MODEL_ID=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ ! -f "$f" ] && continue
+  case "$f" in
+    tests/*|*.test.*|*.spec.*|*.md|docs/*|.github/*|scripts/*) continue ;;
+  esac
+
+  # Look for embedding creation calls without model_id tagging
+  if grep -qE 'embeddings\.create|\.embed\(' "$f" 2>/dev/null; then
+    if ! grep -qE 'model_?[Ii]d|modelId' "$f" 2>/dev/null; then
+      MISSING_MODEL_ID+="  - \`$f\` — embedding operation without model_id tagging"$'\n'
+    fi
+  fi
+done <<< "$CHANGED_ALL"
+
+if [ -n "$MISSING_MODEL_ID" ]; then
+  add_error "Vector operations missing model_id (§19 HARD GATE):"$'\n'"$MISSING_MODEL_ID"
+else
+  add_pass "All vector operations include model_id tagging"
 fi
 
 REPORT+=$'\n'
