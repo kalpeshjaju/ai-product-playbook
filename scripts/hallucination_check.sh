@@ -180,7 +180,7 @@ if [ -f ".env.example" ]; then
       | sed 's/process\.env\.//' || true
   done | sort -u)
 
-  DOCUMENTED_ENVS=$(grep -oE '^[A-Z_]+' .env.example | sort -u)
+  DOCUMENTED_ENVS=$(grep -oE '^[A-Z0-9_]+' .env.example | sort -u)
   FRAMEWORK_VARS="CI NODE_ENV PYTHONPATH PATH HOME USER GITHUB_TOKEN GITHUB_EVENT_PATH GITHUB_ACTIONS GITHUB_PR_NUMBER DATABASE_URL PORT"
 
   MISSING_ENVS=""
