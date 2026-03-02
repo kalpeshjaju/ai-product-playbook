@@ -1,0 +1,31 @@
+# Ingestion Worker — BullMQ job processor
+#
+# WHY: Separate from API server to avoid queue processing blocking API requests.
+# HOW: Same monorepo build as API, but runs worker.js instead of server.js.
+
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install deps
+COPY package*.json turbo.json ./
+COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-llm/package.json packages/shared-llm/
+COPY apps/api/package.json apps/api/
+
+RUN npm ci --legacy-peer-deps --ignore-scripts
+
+# Copy source
+COPY packages/shared-types/ packages/shared-types/
+COPY packages/shared-llm/ packages/shared-llm/
+COPY apps/api/ apps/api/
+COPY tsconfig*.json ./
+
+# Build
+RUN npx turbo run build --filter=@playbook/api
+
+# Run as non-root
+RUN adduser --disabled-password --gecos '' appuser
+USER appuser
+
+CMD ["node", "apps/api/dist/worker.js"]

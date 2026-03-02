@@ -23,10 +23,12 @@ const worker = createIngestionWorker(REDIS_URL, concurrency);
 worker.on('completed', (job, returnvalue) => {
   process.stderr.write(`INFO: Job ${job.id} (${job.data.type}) completed for doc ${job.data.documentId}\n`);
 
-  // Persist enrichment results to the documents table
+  // Persist enrichment results to the documents table.
+  // BullMQ passes returnvalue as a JSON string — parse before writing to JSONB column.
   if (job.data.type === 'enrich' && returnvalue && job.data.documentId) {
+    const enrichment = typeof returnvalue === 'string' ? JSON.parse(returnvalue) as Record<string, unknown> : returnvalue;
     db.update(documents)
-      .set({ enrichmentStatus: returnvalue })
+      .set({ enrichmentStatus: enrichment })
       .where(eq(documents.id, job.data.documentId))
       .then(() => {
         process.stderr.write(`INFO: Enrichment persisted for doc ${job.data.documentId}\n`);
