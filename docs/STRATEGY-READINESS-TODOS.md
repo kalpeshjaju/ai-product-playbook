@@ -39,12 +39,12 @@
 
 ## 3. P0 pending (must close for real-world production readiness)
 
-- [ ] **Enforce Langfuse live gate in production runs** (`LANGFUSE_LIVE_REQUIRED=true` + secrets).
-  - Gap: live gate exists, but currently runs in optional mode when Langfuse secrets/flag are not configured.
-  - Close by: configure `PRODUCTION_LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and set `LANGFUSE_LIVE_REQUIRED=true`.
-- [ ] **Finalize production env settings for provider policy** (`STRATEGY_PROVIDER_MODE`, optional break-glass flag).
-  - Gap: code now defaults to strict in production, but env policy ownership/runbook still needs explicit sign-off.
-  - Close by: set env defaults across Railway/Vercel + document break-glass procedure.
+- [x] **Enforce Langfuse live gate in production runs** (`LANGFUSE_LIVE_REQUIRED=true` + secrets).
+  - Closed by: configured `PRODUCTION_LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and set repo variable `LANGFUSE_LIVE_REQUIRED=true`.
+  - Evidence: GitHub Actions secrets/variables metadata + smoke-prod run `22563286191` (API job passed `Verify Langfuse live endpoint`).
+- [x] **Finalize production env settings for provider policy** (`STRATEGY_PROVIDER_MODE`, optional break-glass flag).
+  - Closed by: set Railway production vars (`STRATEGY_PROVIDER_MODE=strict`, `STRATEGY_PROVIDER_ALLOW_OPEN_IN_PRODUCTION=false`) and documented ownership + break-glass process.
+  - Evidence: `docs/runbooks/strategy-provider-policy.md`
 - [ ] **Finalize flywheel scope governance** (`FLYWHEEL_TASK_TYPES`, optional `FLYWHEEL_USER_IDS`).
   - Gap: workflow now supports infer-all fallback, but owner-level defaults/runbook still need explicit org sign-off.
   - Close by: configure repo vars + add owner runbook entry.
