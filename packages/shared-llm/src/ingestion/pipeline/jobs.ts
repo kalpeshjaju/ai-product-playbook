@@ -21,20 +21,31 @@ export interface EnrichPayload {
 }
 
 /** Payload for the DEDUP_CHECK job — detects duplicate documents by hash or embedding. */
+export interface ExistingEmbedding {
+  docId: string;
+  embedding: number[];
+}
+
+/** Payload for the DEDUP_CHECK job — detects duplicate documents by hash or embedding. */
 export interface DedupCheckPayload {
   contentHash: string;
   embedding?: number[];
+  knownHashes?: string[];
+  existingEmbeddings?: ExistingEmbedding[];
 }
 
 /** Payload for the RE_EMBED job — migrates embeddings from one model to another. */
 export interface ReEmbedPayload {
   oldModelId: string;
   newModelId: string;
+  chunks: string[];
 }
 
 /** Payload for the FRESHNESS job — checks if a document is stale and needs re-ingestion. */
 export interface FreshnessPayload {
   maxAgeDays?: number;
+  ingestedAt?: string | null;
+  validUntil?: string | null;
 }
 
 /** Payload for the SCRAPE job — fetches and ingests content from a URL. */

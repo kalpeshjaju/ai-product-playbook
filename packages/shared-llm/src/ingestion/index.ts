@@ -18,6 +18,7 @@ export type {
   EmbedPayload,
   EnrichPayload,
   DedupCheckPayload,
+  ExistingEmbedding,
   ReEmbedPayload,
   FreshnessPayload,
   ScrapePayload,
