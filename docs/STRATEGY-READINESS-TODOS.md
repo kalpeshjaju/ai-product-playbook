@@ -32,19 +32,15 @@
   - Evidence: `apps/api/src/routes/preferences.ts`
 - [x] **Flywheel workflow now has config/secret preflight with infer-all fallback**.
   - Evidence: `.github/workflows/strategy-flywheel.yml`, `scripts/run-strategy-flywheel.ts`
-- [x] **Strategy provider strictness policy implemented** (Composio/OpenPipe/Memory).
-  - Evidence: `apps/api/src/middleware/provider-policy.ts`, strategy routes + tests
-- [x] **Langfuse live verification gate added to production smoke flow**.
-  - Evidence: `scripts/check-langfuse-live.sh`, `.github/workflows/smoke-prod.yml`
 
 ## 3. P0 pending (must close for real-world production readiness)
 
-- [x] **Enforce Langfuse live gate in production runs** (`LANGFUSE_LIVE_REQUIRED=true` + secrets).
-  - Closed by: configured `PRODUCTION_LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and set repo variable `LANGFUSE_LIVE_REQUIRED=true`.
-  - Evidence: GitHub Actions secrets/variables metadata + smoke-prod run `22563286191` (API job passed `Verify Langfuse live endpoint`).
-- [x] **Finalize production env settings for provider policy** (`STRATEGY_PROVIDER_MODE`, optional break-glass flag).
-  - Closed by: set Railway production vars (`STRATEGY_PROVIDER_MODE=strict`, `STRATEGY_PROVIDER_ALLOW_OPEN_IN_PRODUCTION=false`) and documented ownership + break-glass process.
-  - Evidence: `docs/runbooks/strategy-provider-policy.md`
+- [ ] **Enable production verification for Langfuse traces/costs** (not just wiring).
+  - Gap: code is instrumented, but this checklist still lacks hard evidence that production traces/cost ingestion is healthy.
+  - Close by: run workflow/manual check and store proof artifact from live env.
+- [ ] **Decide fail-open vs fail-closed policy for strategy-critical providers** (Composio, OpenPipe, memory).
+  - Gap: several integrations intentionally no-op when keys are missing.
+  - Close by: enforce strict mode in production or add explicit degradation SLO + alerting.
 - [ ] **Finalize flywheel scope governance** (`FLYWHEEL_TASK_TYPES`, optional `FLYWHEEL_USER_IDS`).
   - Gap: workflow now supports infer-all fallback, but owner-level defaults/runbook still need explicit org sign-off.
   - Close by: configure repo vars + add owner runbook entry.

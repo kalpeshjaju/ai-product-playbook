@@ -114,9 +114,7 @@ interface InferenceSummary {
   skippedExplicit: number;
 }
 
-/**
- * Build feedback signals for preference inference from the last N generations.
- */
+/** Build feedback signals for preference inference from the last N generations. */
 async function loadFeedbackSignals(userId: string, limit = 100): Promise<FeedbackSignal[]> {
   const rows = await db
     .select()
@@ -139,9 +137,7 @@ async function loadFeedbackSignals(userId: string, limit = 100): Promise<Feedbac
   }));
 }
 
-/**
- * Infer and persist preferences for one user, preserving explicit preferences.
- */
+/** Infer and persist preferences for one user, preserving explicit preferences. */
 async function inferForUser(userId: string): Promise<InferenceSummary> {
   const signals = await loadFeedbackSignals(userId);
   const inferred = inferPreferences(signals);
